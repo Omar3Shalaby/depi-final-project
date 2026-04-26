@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
-
 import 'package:nutri_vision/Screens/login.dart';
 
 /// Pure content widget — Scaffold, background & nav bar live in MainShell.

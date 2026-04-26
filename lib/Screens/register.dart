@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nutri_vision/Screens/login.dart';
 // Import your login screen if you want to navigate back to it
 // import 'package:your_app_name/screens/login.dart';
 
@@ -12,8 +13,24 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _isLoading = false;
+  
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
 
   @override
+  
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+  
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
@@ -97,16 +114,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ],
                   ),
+                  child: Form(
+                    key: _formKey,
                   child: Column(
                     children: [
                       // Name Field
-                      _buildTextField(hint: 'Name', icon: Icons.person_outline),
+                      _buildTextField(
+                          hint: 'Name', 
+                          icon: Icons.person_outline,
+                          controller: _nameController,
+                      ),
                       const SizedBox(height: 16),
 
                       // Email Field
                       _buildTextField(
                         hint: 'Email',
                         icon: Icons.email_outlined,
+                        controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
                       ),
                       const SizedBox(height: 16),
@@ -115,13 +139,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       _buildTextField(
                         hint: 'Password',
                         icon: Icons.lock_outline,
+                        controller: _passwordController,
                         isPassword: true,
                         obscureText: _obscurePassword,
-                        onToggleVisibility: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
+                        onToggleVisibility: () => 
+                            setState(() => 
+                        _obscurePassword = !_obscurePassword
+                        ),
                       ),
                       const SizedBox(height: 16),
 
@@ -129,13 +153,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       _buildTextField(
                         hint: 'Confirm Password',
                         icon: Icons.lock_outline,
+                        controller: _confirmPasswordController,
                         isPassword: true,
                         obscureText: _obscureConfirmPassword,
-                        onToggleVisibility: () {
-                          setState(() {
-                            _obscureConfirmPassword = !_obscureConfirmPassword;
-                          });
-                        },
+                        onToggleVisibility: () => 
+                            setState(() => 
+                            _obscureConfirmPassword = !_obscureConfirmPassword
+                        ),
                       ),
                       const SizedBox(height: 24),
 
@@ -144,19 +168,61 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         width: double.infinity,
                         height: 50,
                         child: ElevatedButton(
-                          onPressed: () {
-                            // Handle registration logic
+                          onPressed: _isLoading ? null : () {
+                            if (_formKey.currentState!.validate()) {
+                              setState(() => _isLoading = true);
+
+                              final name = _nameController.text.trim();
+                              final email = _emailController.text.trim();
+                              final password = _passwordController.text.trim();
+
+                              debugPrint('Name: $name, Email: $email');
+
+                              Future.delayed(const Duration(seconds: 1), () {
+                                setState(() => _isLoading = false);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                      content: Text("Your account has been created successfully."),
+                                    backgroundColor: Colors.green.shade700,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                );
+
+                                //Navigate to Home Screen
+                                Navigator.pushReplacementNamed(context, '/home');
+                              });
+
+                              /*
+                              For Firebase Authentication
+                              FirebaseAuth.instance.createUserWithEmailAndPassword(
+                                email: email,
+                                password: password,
+                              ).then((userCredential) {
+                                // Registration successful, you can navigate to the home screen or show a success message
+                                Navigator.pushReplacementNamed(context, '/home');
+                              }).catchError((error) {
+                                // Handle registration errors (e.g., email already in use)
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(error.message)),
+                                );
+                              });
+                              */
+
+                            }
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(
-                              0xFF5A8F69,
-                            ), // Matches the slightly muted green in the design
+                            backgroundColor: const Color(0xFF5A8F69,), // Matches the slightly muted green in the design
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                             elevation: 0,
                           ),
-                          child: const Text(
+                          child: _isLoading
+                              ? const CircularProgressIndicator(color: Colors.white)
+                              : const Text(
                             'Create Account',
                             style: TextStyle(
                               fontSize: 16,
@@ -207,6 +273,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     ],
                   ),
                 ),
+                ),
                 const SizedBox(height: 40),
               ],
             ),
@@ -220,14 +287,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget _buildTextField({
     required String hint,
     required IconData icon,
+    required TextEditingController controller,
     bool isPassword = false,
     bool obscureText = false,
     VoidCallback? onToggleVisibility,
     TextInputType? keyboardType,
   }) {
-    return TextField(
+    return TextFormField(
+      controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
+      validator: (value) {
+        if (value == null || value.trim().isEmpty){
+          return '$hint is required.';
+        }
+        if (hint == 'Email' && !value.contains('@')){
+          return 'Please Enter a valid Email.';
+        }
+        if (hint == 'Password' && value.length < 6){
+          return 'Password Must be at least 6 characters.';
+        }
+        if (hint == 'Confirm Password' && value != _passwordController.text){
+          return 'Passwords do not match.';
+        }
+        return null;
+      },
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 15),

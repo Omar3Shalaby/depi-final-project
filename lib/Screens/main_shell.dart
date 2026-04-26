@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nutri_vision/Screens/meal_details.dart';
 import 'home.dart';
 import 'log_meal.dart';
 import 'history.dart';
@@ -63,6 +64,7 @@ class _MainShellState extends State<MainShell> {
                     LogMealContent(),   // index 2
                     _StubPage('AI Recipes coming soon'), // index 3
                     ProfileContent(),   // index 4
+                    MealDetailsScreen(), // index 5
                   ],
                 ),
 
