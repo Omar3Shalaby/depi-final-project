@@ -34,7 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
-                    vertical: 50,
+                    vertical: 20,
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.start,
@@ -52,13 +52,16 @@ class _LoginScreenState extends State<LoginScreen> {
                         },
                       ),
                       const SizedBox(width: 12),
-                      Text(
-                        'NutriVision',
-                        style: TextStyle(
-                          fontSize: 34,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green[800],
-                          letterSpacing: -0.5,
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Text(
+                          'NutriVision',
+                          style: TextStyle(
+                            fontSize: 34,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green[800],
+                            letterSpacing: -0.5,
+                          ),
                         ),
                       ),
                     ],

@@ -14,7 +14,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
-  
+
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -22,7 +22,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirmPasswordController = TextEditingController();
 
   @override
-  
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
@@ -30,7 +29,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _confirmPasswordController.dispose();
     super.dispose();
   }
-  
+
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
@@ -56,7 +55,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     children: [
                       Image.asset(
                         'assets/logo.png',
-                        height: 70,
+                        height: 100,
                         errorBuilder: (context, error, stackTrace) {
                           // Fallback icon if the asset isn't loaded
                           return Icon(
@@ -116,86 +115,102 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   child: Form(
                     key: _formKey,
-                  child: Column(
-                    children: [
-                      // Name Field
-                      _buildTextField(
-                          hint: 'Name', 
+                    child: Column(
+                      children: [
+                        // Name Field
+                        _buildTextField(
+                          hint: 'Name',
                           icon: Icons.person_outline,
                           controller: _nameController,
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Email Field
-                      _buildTextField(
-                        hint: 'Email',
-                        icon: Icons.email_outlined,
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Password Field
-                      _buildTextField(
-                        hint: 'Password',
-                        icon: Icons.lock_outline,
-                        controller: _passwordController,
-                        isPassword: true,
-                        obscureText: _obscurePassword,
-                        onToggleVisibility: () => 
-                            setState(() => 
-                        _obscurePassword = !_obscurePassword
                         ),
-                      ),
-                      const SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
-                      // Confirm Password Field
-                      _buildTextField(
-                        hint: 'Confirm Password',
-                        icon: Icons.lock_outline,
-                        controller: _confirmPasswordController,
-                        isPassword: true,
-                        obscureText: _obscureConfirmPassword,
-                        onToggleVisibility: () => 
-                            setState(() => 
-                            _obscureConfirmPassword = !_obscureConfirmPassword
+                        // Email Field
+                        _buildTextField(
+                          hint: 'Email',
+                          icon: Icons.email_outlined,
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
                         ),
-                      ),
-                      const SizedBox(height: 24),
+                        const SizedBox(height: 16),
 
-                      // Create Account Button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : () {
-                            if (_formKey.currentState!.validate()) {
-                              setState(() => _isLoading = true);
+                        // Password Field
+                        _buildTextField(
+                          hint: 'Password',
+                          icon: Icons.lock_outline,
+                          controller: _passwordController,
+                          isPassword: true,
+                          obscureText: _obscurePassword,
+                          onToggleVisibility: () => setState(
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
 
-                              final name = _nameController.text.trim();
-                              final email = _emailController.text.trim();
-                              final password = _passwordController.text.trim();
+                        // Confirm Password Field
+                        _buildTextField(
+                          hint: 'Confirm Password',
+                          icon: Icons.lock_outline,
+                          controller: _confirmPasswordController,
+                          isPassword: true,
+                          obscureText: _obscureConfirmPassword,
+                          onToggleVisibility: () => setState(
+                            () => _obscureConfirmPassword =
+                                !_obscureConfirmPassword,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
 
-                              debugPrint('Name: $name, Email: $email');
+                        // Create Account Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: _isLoading
+                                ? null
+                                : () {
+                                    if (_formKey.currentState!.validate()) {
+                                      setState(() => _isLoading = true);
 
-                              Future.delayed(const Duration(seconds: 1), () {
-                                setState(() => _isLoading = false);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                      content: Text("Your account has been created successfully."),
-                                    backgroundColor: Colors.green.shade700,
-                                    behavior: SnackBarBehavior.floating,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                );
+                                      final name = _nameController.text.trim();
+                                      final email = _emailController.text
+                                          .trim();
+                                      final password = _passwordController.text
+                                          .trim();
 
-                                //Navigate to Home Screen
-                                Navigator.pushReplacementNamed(context, '/home');
-                              });
+                                      debugPrint('Name: $name, Email: $email');
 
-                              /*
+                                      Future.delayed(
+                                        const Duration(seconds: 1),
+                                        () {
+                                          setState(() => _isLoading = false);
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                "Your account has been created successfully.",
+                                              ),
+                                              backgroundColor:
+                                                  Colors.green.shade700,
+                                              behavior:
+                                                  SnackBarBehavior.floating,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
+                                              ),
+                                            ),
+                                          );
+
+                                          //Navigate to Home Screen
+                                          Navigator.pushReplacementNamed(
+                                            context,
+                                            '/home',
+                                          );
+                                        },
+                                      );
+
+                                      /*
                               For Firebase Authentication
                               FirebaseAuth.instance.createUserWithEmailAndPassword(
                                 email: email,
@@ -210,69 +225,75 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 );
                               });
                               */
-
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF5A8F69,), // Matches the slightly muted green in the design
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                                    }
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(
+                                0xFF5A8F69,
+                              ), // Matches the slightly muted green in the design
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 0,
                             ),
-                            elevation: 0,
-                          ),
-                          child: _isLoading
-                              ? const CircularProgressIndicator(color: Colors.white)
-                              : const Text(
-                            'Create Account',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
+                            child: _isLoading
+                                ? const CircularProgressIndicator(
+                                    color: Colors.white,
+                                  )
+                                : const Text(
+                                    'Create Account',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 20),
+                        const SizedBox(height: 20),
 
-                      // Login Link
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text(
-                            "Already have an account? ",
-                            style: TextStyle(color: Colors.grey, fontSize: 14),
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              // Navigate back to Login Screen
-                              Navigator.pop(context);
-                              // OR if you want to push replacement:
-                              // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
-                            },
-                            child: const Row(
-                              children: [
-                                Text(
-                                  'Log in',
-                                  style: TextStyle(
-                                    color: Color(0xFF333333),
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                SizedBox(width: 4),
-                                Icon(
-                                  Icons.arrow_forward_ios,
-                                  size: 12,
-                                  color: Color(0xFF333333),
-                                ),
-                              ],
+                        // Login Link
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text(
+                              "Already have an account? ",
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 14,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                            GestureDetector(
+                              onTap: () {
+                                // Navigate back to Login Screen
+                                Navigator.pop(context);
+                                // OR if you want to push replacement:
+                                // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
+                              },
+                              child: const Row(
+                                children: [
+                                  Text(
+                                    'Log in',
+                                    style: TextStyle(
+                                      color: Color(0xFF333333),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Icon(
+                                    Icons.arrow_forward_ios,
+                                    size: 12,
+                                    color: Color(0xFF333333),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
                 ),
                 const SizedBox(height: 40),
               ],
@@ -298,16 +319,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
       obscureText: obscureText,
       keyboardType: keyboardType,
       validator: (value) {
-        if (value == null || value.trim().isEmpty){
+        if (value == null || value.trim().isEmpty) {
           return '$hint is required.';
         }
-        if (hint == 'Email' && !value.contains('@')){
+        if (hint == 'Email' && !value.contains('@')) {
           return 'Please Enter a valid Email.';
         }
-        if (hint == 'Password' && value.length < 6){
+        if (hint == 'Password' && value.length < 6) {
           return 'Password Must be at least 6 characters.';
         }
-        if (hint == 'Confirm Password' && value != _passwordController.text){
+        if (hint == 'Confirm Password' && value != _passwordController.text) {
           return 'Passwords do not match.';
         }
         return null;
