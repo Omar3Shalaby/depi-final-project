@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:math' as math;
 import 'package:nutri_vision/Screens/login.dart';
 
@@ -12,6 +13,7 @@ class ProfileContent extends StatefulWidget {
 
 class _ProfileContentState extends State<ProfileContent> {
   bool _notificationsEnabled = true;
+  final User? _user = FirebaseAuth.instance.currentUser;
 
   @override
   Widget build(BuildContext context) {
@@ -90,9 +92,9 @@ class _ProfileContentState extends State<ProfileContent> {
                   ],
                 ),
                 const SizedBox(height: 14),
-                const Text(
-                  'Ahmad Malik',
-                  style: TextStyle(
+                Text(
+                  _user?.displayName ?? 'User Name',
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF2D3748),
@@ -100,7 +102,7 @@ class _ProfileContentState extends State<ProfileContent> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'ahmad.malik@email.com',
+                  _user?.email ?? 'user@email.com',
                   style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
                 ),
               ],
@@ -335,11 +337,15 @@ class _ProfileContentState extends State<ProfileContent> {
             width: double.infinity,
             height: 50,
             child: OutlinedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                );
+              onPressed: () async {
+                await FirebaseAuth.instance.signOut();
+                if (mounted) {
+                  Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                        builder: (context) => const LoginScreen()),
+                    (route) => false,
+                  );
+                }
               },
               icon: const Icon(
                 Icons.logout_rounded,

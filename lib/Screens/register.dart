@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:nutri_vision/Screens/login.dart';
 // Import your login screen if you want to navigate back to it
 // import 'package:your_app_name/screens/login.dart';
@@ -30,6 +31,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
@@ -173,58 +175,49 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       setState(() => _isLoading = true);
 
                                       final name = _nameController.text.trim();
-                                      final email = _emailController.text
-                                          .trim();
-                                      final password = _passwordController.text
-                                          .trim();
+                                      final email = _emailController.text.trim();
+                                      final password = _passwordController.text.trim();
 
-                                      debugPrint('Name: $name, Email: $email');
+                                      FirebaseAuth.instance
+                                          .createUserWithEmailAndPassword(
+                                        email: email,
+                                        password: password,
+                                      )
+                                          .then((userCredential) async {
+                                        // Update display name
+                                        await userCredential.user!
+                                            .updateDisplayName(name);
 
-                                      Future.delayed(
-                                        const Duration(seconds: 1),
-                                        () {
-                                          setState(() => _isLoading = false);
-                                          ScaffoldMessenger.of(
-                                            context,
-                                          ).showSnackBar(
-                                            SnackBar(
-                                              content: Text(
-                                                "Your account has been created successfully.",
-                                              ),
-                                              backgroundColor:
-                                                  Colors.green.shade700,
-                                              behavior:
-                                                  SnackBarBehavior.floating,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                              ),
+                                        if (!mounted) return;
+
+                                        setState(() => _isLoading = false);
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content: const Text(
+                                                "Your account has been created successfully."),
+                                            backgroundColor:
+                                                Colors.green.shade700,
+                                            behavior:
+                                                SnackBarBehavior.floating,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
                                             ),
+                                          ),
+                                        );
+                                        Navigator.pushReplacementNamed(
+                                            context, '/home');
+                                      }).catchError((error) {
+                                        if (mounted) {
+                                          setState(() => _isLoading = false);
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                                content: Text(error is FirebaseAuthException ? error.message ?? 'Registration failed' : error.toString())),
                                           );
-
-                                          //Navigate to Home Screen
-                                          Navigator.pushReplacementNamed(
-                                            context,
-                                            '/home',
-                                          );
-                                        },
-                                      );
-
-                                      /*
-                              For Firebase Authentication
-                              FirebaseAuth.instance.createUserWithEmailAndPassword(
-                                email: email,
-                                password: password,
-                              ).then((userCredential) {
-                                // Registration successful, you can navigate to the home screen or show a success message
-                                Navigator.pushReplacementNamed(context, '/home');
-                              }).catchError((error) {
-                                // Handle registration errors (e.g., email already in use)
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text(error.message)),
-                                );
-                              });
-                              */
+                                        }
+                                      });
                                     }
                                   },
                             style: ElevatedButton.styleFrom(

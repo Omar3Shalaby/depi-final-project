@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "70457647569",
+    "project_id": "depi-final-project-a2760",
+    "storage_bucket": "depi-final-project-a2760.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:70457647569:android:54923ebe30a2253a5700f0",
+        "android_client_info": {
+          "package_name": "com.example.nutri_vision"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "70457647569-sj6jn0ousbmjh44ucugcopc4vc7g1qe4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.nutri_vision",
+            "certificate_hash": "d461df836246e359f6d0059aa8390a1f37095da0"
+          }
+        },
+        {
+          "client_id": "70457647569-7015h9k37mvp8b3pjinl3sid853igb0p.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDN9EamZ-ak9WACvSWLJDy14WI45s_21io"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "70457647569-7015h9k37mvp8b3pjinl3sid853igb0p.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "70457647569-uq2fegehuq2qf5ke0a378fujbkrne60r.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.nutriVision"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

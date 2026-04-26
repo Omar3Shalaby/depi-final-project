@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:nutri_vision/Screens/main_shell.dart';
-import 'package:nutri_vision/Screens/meal_details.dart';
 
 /// Pure content widget — Scaffold, background & nav bar live in MainShell.
 class LogMealContent extends StatefulWidget {
