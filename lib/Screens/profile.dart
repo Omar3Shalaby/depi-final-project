@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:math' as math;
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:nutri_vision/Screens/login.dart';
+import 'package:nutri_vision/Screens/Edit_Profile.dart';
+import 'package:nutri_vision/Screens/Edit_Goals.dart';
 
 /// Pure content widget — Scaffold, background & nav bar live in MainShell.
 class ProfileContent extends StatefulWidget {
@@ -14,6 +18,38 @@ class ProfileContent extends StatefulWidget {
 class _ProfileContentState extends State<ProfileContent> {
   bool _notificationsEnabled = true;
   final User? _user = FirebaseAuth.instance.currentUser;
+  String _displayName = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadName();
+    _loadGoals();
+  }
+
+  Future<void> _loadName() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _displayName = prefs.getString('name') ??
+          _user?.displayName ??
+          'User Name';
+    });
+  }
+
+  String _calories = '2000';
+  String _protein = '150g';
+  String _carbs = '250g';
+  String _fat = '60g';
+
+  Future<void> _loadGoals() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _calories = prefs.getString('Calories') ?? '2000';
+      _protein = '${prefs.getString('Protein') ?? '150'}g';
+      _carbs = '${prefs.getString('Carbs') ?? '250'}g';
+      _fat = '${prefs.getString('Fat') ?? '60'}g';
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,17 +111,25 @@ class _ProfileContentState extends State<ProfileContent> {
                     Positioned(
                       bottom: 2,
                       right: 2,
-                      child: Container(
-                        width: 26,
-                        height: 26,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF4A8B5C),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.edit_rounded,
-                          color: Colors.white,
-                          size: 14,
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+                          ).then((_) => _loadName());
+                        },
+                        child: Container(
+                          width: 26,
+                          height: 26,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF4A8B5C),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.edit_rounded,
+                            color: Colors.white,
+                            size: 14,
+                          ),
                         ),
                       ),
                     ),
@@ -93,7 +137,7 @@ class _ProfileContentState extends State<ProfileContent> {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  _user?.displayName ?? 'User Name',
+                  _displayName,
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -154,15 +198,21 @@ class _ProfileContentState extends State<ProfileContent> {
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
-                          CustomPaint(
+                          Positioned.fill(
+                            child: CustomPaint(
                             size: const Size(110, 110),
-                            painter: _GoalChartPainter(),
+                            painter: _GoalChartPainter(
+                              carbs: double.parse(_carbs.replaceAll('g', '').trim().isEmpty ? '250' : _carbs.replaceAll('g', '').trim()),
+                              protein: double.parse(_protein.replaceAll('g', '').trim().isEmpty ? '150' : _protein.replaceAll('g', '').trim()),
+                              fat: double.parse(_fat.replaceAll('g', '').trim().isEmpty ? '60' : _fat.replaceAll('g', '').trim()),
+                               ),
+                            ),
                           ),
-                          const Column(
+                           Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                '2000',
+                                _calories,
                                 style: TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
@@ -199,20 +249,20 @@ class _ProfileContentState extends State<ProfileContent> {
                           const SizedBox(height: 10),
                           _buildGoalRow(
                             color: const Color(0xFFF2A65A),
-                            goal: '250g Carbs',
-                            value: '250g',
+                            goal: '$_carbs Carbs',
+                            value: _carbs,
                           ),
                           const SizedBox(height: 8),
                           _buildGoalRow(
                             color: const Color(0xFF5A92D6),
-                            goal: '150g Protein',
-                            value: '150g',
+                            goal: '$_protein Protein',
+                            value: _protein,
                           ),
                           const SizedBox(height: 8),
                           _buildGoalRow(
                             color: const Color(0xFF4A8B5C),
-                            goal: '60g Fat',
-                            value: '12g',
+                            goal: '$_fat Fat',
+                            value: _fat,
                           ),
                         ],
                       ),
@@ -226,7 +276,12 @@ class _ProfileContentState extends State<ProfileContent> {
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.push(
+                          context, 
+                          MaterialPageRoute(builder: (context) => const EditGoalsScreen()),
+                      ).then((_) => _loadGoals());
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2C5E3B),
                       shape: RoundedRectangleBorder(
@@ -296,7 +351,12 @@ class _ProfileContentState extends State<ProfileContent> {
                     Icons.chevron_right_rounded,
                     color: Colors.grey.shade400,
                   ),
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+                    ).then((_) => _loadName());
+                  },
                 ),
                 _buildDivider(),
 
@@ -452,6 +512,16 @@ class _ProfileContentState extends State<ProfileContent> {
 
 // ── Goal Donut Chart Painter ──────────────────────────────────────────────────
 class _GoalChartPainter extends CustomPainter {
+  final double carbs;
+  final double protein;
+  final double fat;
+
+  _GoalChartPainter({
+    required this.carbs,
+    required this.protein,
+    required this.fat,
+  });
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
@@ -464,42 +534,51 @@ class _GoalChartPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     const double startAngle = -math.pi / 2;
+    const double gap = 0.08;
+
+    final total = carbs + protein + fat;
+    final carbsAngle = (carbs / total) * 2 * math.pi;
+    final proteinAngle = (protein / total) * 2 * math.pi;
+    final fatAngle = (fat / total) * 2 * math.pi;
 
     // Background ring
     paint.color = Colors.grey.shade100;
     canvas.drawCircle(center, radius, paint);
 
-    // Carbs — orange, ~47%
+    // Carbs — orange
     paint.color = const Color(0xFFF2A65A);
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       startAngle,
-      math.pi * 0.94,
+      carbsAngle - gap,
       false,
       paint,
     );
 
-    // Protein — blue, ~31%
+    // Protein — blue
     paint.color = const Color(0xFF5A92D6);
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
-      startAngle + math.pi * 0.94 + 0.08,
-      math.pi * 0.62,
+      startAngle + carbsAngle,
+      proteinAngle - gap,
       false,
       paint,
     );
 
-    // Fat — green, ~22%
+    // Fat — green
     paint.color = const Color(0xFF4A8B5C);
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
-      startAngle + math.pi * 0.94 + math.pi * 0.62 + 0.16,
-      math.pi * 0.36,
+      startAngle + carbsAngle + proteinAngle,
+      fatAngle - gap,
       false,
       paint,
     );
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(_GoalChartPainter oldDelegate) =>
+      oldDelegate.carbs != carbs ||
+          oldDelegate.protein != protein ||
+          oldDelegate.fat != fat;
 }
