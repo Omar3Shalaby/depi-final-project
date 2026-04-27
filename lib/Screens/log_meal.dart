@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nutri_vision/Screens/main_shell.dart';
 
 /// Pure content widget — Scaffold, background & nav bar live in MainShell.
 class LogMealContent extends StatefulWidget {
@@ -110,6 +111,7 @@ class _LogMealContentState extends State<LogMealContent> {
                   child: ElevatedButton(
                     onPressed: () {
                       setState(() => _isAnalyzing = !_isAnalyzing);
+                      MainShellScope.of(context)?.setIndex(5);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF4A8B5C),

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:nutri_vision/Screens/login.dart';
 // Import your login screen if you want to navigate back to it
 // import 'package:your_app_name/screens/login.dart';
 
@@ -12,6 +14,22 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _isLoading = false;
+
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +57,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     children: [
                       Image.asset(
                         'assets/logo.png',
-                        height: 70,
+                        height: 100,
                         errorBuilder: (context, error, stackTrace) {
                           // Fallback icon if the asset isn't loaded
                           return Icon(
@@ -97,114 +115,177 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                     ],
                   ),
-                  child: Column(
-                    children: [
-                      // Name Field
-                      _buildTextField(hint: 'Name', icon: Icons.person_outline),
-                      const SizedBox(height: 16),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        // Name Field
+                        _buildTextField(
+                          hint: 'Name',
+                          icon: Icons.person_outline,
+                          controller: _nameController,
+                        ),
+                        const SizedBox(height: 16),
 
-                      // Email Field
-                      _buildTextField(
-                        hint: 'Email',
-                        icon: Icons.email_outlined,
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      const SizedBox(height: 16),
+                        // Email Field
+                        _buildTextField(
+                          hint: 'Email',
+                          icon: Icons.email_outlined,
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                        ),
+                        const SizedBox(height: 16),
 
-                      // Password Field
-                      _buildTextField(
-                        hint: 'Password',
-                        icon: Icons.lock_outline,
-                        isPassword: true,
-                        obscureText: _obscurePassword,
-                        onToggleVisibility: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Confirm Password Field
-                      _buildTextField(
-                        hint: 'Confirm Password',
-                        icon: Icons.lock_outline,
-                        isPassword: true,
-                        obscureText: _obscureConfirmPassword,
-                        onToggleVisibility: () {
-                          setState(() {
-                            _obscureConfirmPassword = !_obscureConfirmPassword;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 24),
-
-                      // Create Account Button
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            // Handle registration logic
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(
-                              0xFF5A8F69,
-                            ), // Matches the slightly muted green in the design
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: const Text(
-                            'Create Account',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
+                        // Password Field
+                        _buildTextField(
+                          hint: 'Password',
+                          icon: Icons.lock_outline,
+                          controller: _passwordController,
+                          isPassword: true,
+                          obscureText: _obscurePassword,
+                          onToggleVisibility: () => setState(
+                            () => _obscurePassword = !_obscurePassword,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 20),
+                        const SizedBox(height: 16),
 
-                      // Login Link
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text(
-                            "Already have an account? ",
-                            style: TextStyle(color: Colors.grey, fontSize: 14),
+                        // Confirm Password Field
+                        _buildTextField(
+                          hint: 'Confirm Password',
+                          icon: Icons.lock_outline,
+                          controller: _confirmPasswordController,
+                          isPassword: true,
+                          obscureText: _obscureConfirmPassword,
+                          onToggleVisibility: () => setState(
+                            () => _obscureConfirmPassword =
+                                !_obscureConfirmPassword,
                           ),
-                          GestureDetector(
-                            onTap: () {
-                              // Navigate back to Login Screen
-                              Navigator.pop(context);
-                              // OR if you want to push replacement:
-                              // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
-                            },
-                            child: const Row(
-                              children: [
-                                Text(
-                                  'Log in',
-                                  style: TextStyle(
-                                    color: Color(0xFF333333),
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                SizedBox(width: 4),
-                                Icon(
-                                  Icons.arrow_forward_ios,
-                                  size: 12,
-                                  color: Color(0xFF333333),
-                                ),
-                              ],
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Create Account Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: _isLoading
+                                ? null
+                                : () {
+                                    if (_formKey.currentState!.validate()) {
+                                      setState(() => _isLoading = true);
+
+                                      final name = _nameController.text.trim();
+                                      final email = _emailController.text.trim();
+                                      final password = _passwordController.text.trim();
+
+                                      FirebaseAuth.instance
+                                          .createUserWithEmailAndPassword(
+                                        email: email,
+                                        password: password,
+                                      )
+                                          .then((userCredential) async {
+                                        // Update display name
+                                        await userCredential.user!
+                                            .updateDisplayName(name);
+
+                                        if (!mounted) return;
+
+                                        setState(() => _isLoading = false);
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                            content: const Text(
+                                                "Your account has been created successfully."),
+                                            backgroundColor:
+                                                Colors.green.shade700,
+                                            behavior:
+                                                SnackBarBehavior.floating,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                          ),
+                                        );
+                                        Navigator.pushReplacementNamed(
+                                            context, '/home');
+                                      }).catchError((error) {
+                                        if (mounted) {
+                                          setState(() => _isLoading = false);
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                                content: Text(error is FirebaseAuthException ? error.message ?? 'Registration failed' : error.toString())),
+                                          );
+                                        }
+                                      });
+                                    }
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(
+                                0xFF5A8F69,
+                              ), // Matches the slightly muted green in the design
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 0,
                             ),
+                            child: _isLoading
+                                ? const CircularProgressIndicator(
+                                    color: Colors.white,
+                                  )
+                                : const Text(
+                                    'Create Account',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                           ),
-                        ],
-                      ),
-                    ],
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Login Link
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text(
+                              "Already have an account? ",
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 14,
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () {
+                                // Navigate back to Login Screen
+                                Navigator.pop(context);
+                                // OR if you want to push replacement:
+                                // Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
+                              },
+                              child: const Row(
+                                children: [
+                                  Text(
+                                    'Log in',
+                                    style: TextStyle(
+                                      color: Color(0xFF333333),
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Icon(
+                                    Icons.arrow_forward_ios,
+                                    size: 12,
+                                    color: Color(0xFF333333),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 40),
@@ -220,14 +301,31 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget _buildTextField({
     required String hint,
     required IconData icon,
+    required TextEditingController controller,
     bool isPassword = false,
     bool obscureText = false,
     VoidCallback? onToggleVisibility,
     TextInputType? keyboardType,
   }) {
-    return TextField(
+    return TextFormField(
+      controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
+      validator: (value) {
+        if (value == null || value.trim().isEmpty) {
+          return '$hint is required.';
+        }
+        if (hint == 'Email' && !value.contains('@')) {
+          return 'Please Enter a valid Email.';
+        }
+        if (hint == 'Password' && value.length < 6) {
+          return 'Password Must be at least 6 characters.';
+        }
+        if (hint == 'Confirm Password' && value != _passwordController.text) {
+          return 'Passwords do not match.';
+        }
+        return null;
+      },
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(color: Colors.grey.shade500, fontSize: 15),
