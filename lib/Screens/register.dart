@@ -39,7 +39,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         height: double.infinity,
         decoration: const BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/register bg.png'),
+            image: AssetImage('assets/images/register_bg.png'),
             fit: BoxFit.cover,
           ),
         ),
@@ -56,7 +56,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Image.asset(
-                        'assets/logo.png',
+                        'assets/images/logo.png',
                         height: 100,
                         errorBuilder: (context, error, stackTrace) {
                           // Fallback icon if the asset isn't loaded

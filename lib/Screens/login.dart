@@ -85,9 +85,9 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Google Sign-In failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Google Sign-In failed: $e')));
       }
     } finally {
       if (mounted) {
@@ -104,7 +104,7 @@ class _LoginScreenState extends State<LoginScreen> {
         height: double.infinity,
         decoration: const BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/login bg.png'),
+            image: AssetImage('assets/images/login_bg.png'),
             fit: BoxFit.cover,
           ),
         ),
@@ -124,7 +124,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: [
                       Image.asset(
-                        'assets/logo.png',
+                        'assets/images/logo.png',
                         height: 70, // Increased size
                         errorBuilder: (context, error, stackTrace) {
                           // Fallback icon if the asset isn't loaded

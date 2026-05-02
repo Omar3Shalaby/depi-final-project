@@ -48,7 +48,7 @@ class _MainShellState extends State<MainShell> {
           height: double.infinity,
           decoration: const BoxDecoration(
             image: DecorationImage(
-              image: AssetImage('assets/main bg.png'),
+              image: AssetImage('assets/images/main_bg.png'),
               fit: BoxFit.cover,
             ),
           ),
