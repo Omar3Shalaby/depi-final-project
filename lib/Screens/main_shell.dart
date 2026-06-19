@@ -4,6 +4,7 @@ import 'home.dart';
 import 'log_meal.dart';
 import 'history.dart';
 import 'profile.dart';
+import 'ai_recipe.dart'; // 1. Imported the new AI recipe file
 
 /// Exposes MainShell's tab-switching to child content widgets.
 class MainShellScope extends InheritedWidget {
@@ -62,7 +63,7 @@ class _MainShellState extends State<MainShell> {
                     HomeContent(),      // index 0
                     HistoryContent(),   // index 1
                     LogMealContent(),   // index 2
-                    _StubPage('AI Recipes coming soon'), // index 3
+                    AiRecipeAlternativeContent(), // 2. Replaced the stub here (index 3)
                     ProfileContent(),   // index 4
                     MealDetailsScreen(), // index 5
                   ],
