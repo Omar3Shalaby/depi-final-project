@@ -1,14 +1,92 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'main_shell.dart';
+import 'package:nutri_vision/services/storage_service.dart';
 
 /// Pure content widget — Scaffold, background & nav bar live in MainShell.
-class HomeContent extends StatelessWidget {
+class HomeContent extends StatefulWidget {
   const HomeContent({super.key});
 
   @override
+  State<HomeContent> createState() => _HomeContentState();
+}
+
+class _HomeContentState extends State<HomeContent> {
+  String _displayName = 'Ahmad';
+  int _consumedKcal = 0;
+  int _consumedCarbs = 0;
+  int _consumedProtein = 0;
+  int _consumedFat = 0;
+
+  int _goalKcal = 2000;
+
+  int? _lastIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final scope = MainShellScope.of(context);
+    if (scope != null && scope.currentIndex == 0 && _lastIndex != 0) {
+      _loadData();
+    }
+    _lastIndex = scope?.currentIndex;
+  }
+
+  Future<void> _loadData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final todayMeals = await StorageService.getMealsForDate(DateTime.now());
+
+    int kcalSum = 0;
+    int carbsSum = 0;
+    int proteinSum = 0;
+    int fatSum = 0;
+
+    for (var m in todayMeals) {
+      kcalSum += (m['kcal'] as num).toInt();
+      carbsSum += (m['carbs'] as num).toInt();
+      proteinSum += (m['protein'] as num).toInt();
+      fatSum += (m['fat'] as num).toInt();
+    }
+
+    final name = prefs.getString('name') ??
+        FirebaseAuth.instance.currentUser?.displayName ??
+        'User';
+
+    setState(() {
+      _displayName = name;
+      _consumedKcal = kcalSum;
+      _consumedCarbs = carbsSum;
+      _consumedProtein = proteinSum;
+      _consumedFat = fatSum;
+
+      _goalKcal = int.tryParse(prefs.getString('Calories') ?? '2000') ?? 2000;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final remainingKcal = math.max(0, _goalKcal - _consumedKcal);
+
+    // Compute ratios for donut chart painter
+    final double carbsKcal = _consumedCarbs * 4.0;
+    final double proteinKcal = _consumedProtein * 4.0;
+    final double fatKcal = _consumedFat * 9.0;
+    final double totalKcalCalculated = carbsKcal + proteinKcal + fatKcal;
+
+    final double carbsPercent = totalKcalCalculated > 0 ? (carbsKcal / totalKcalCalculated) : 0.33;
+    final double proteinPercent = totalKcalCalculated > 0 ? (proteinKcal / totalKcalCalculated) : 0.33;
+    final double fatPercent = totalKcalCalculated > 0 ? (fatKcal / totalKcalCalculated) : 0.34;
+    final double totalFraction = _goalKcal > 0 ? (_consumedKcal / _goalKcal).clamp(0.0, 1.0) : 0.0;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.only(
         left: 20,
@@ -24,11 +102,11 @@ class HomeContent extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Hello, Ahmad 👋',
+                'Hello, $_displayName 👋',
                 style: GoogleFonts.poppins(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF2D3748),
+                  color: const Color(0xFF2D3748),
                 ),
               ),
               Container(
@@ -44,7 +122,13 @@ class HomeContent extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: const Icon(Icons.person, color: Color(0xFF718096)),
+                child: GestureDetector(
+                  onTap: () {
+                    // Navigate to Profile tab (index 4)
+                    MainShellScope.of(context)?.setIndex(4);
+                  },
+                  child: const Icon(Icons.person, color: Color(0xFF718096)),
+                ),
               ),
             ],
           ),
@@ -87,22 +171,27 @@ class HomeContent extends StatelessWidget {
                         children: [
                           CustomPaint(
                             size: const Size(120, 120),
-                            painter: NutritionChartPainter(),
+                            painter: NutritionChartPainter(
+                              totalFraction: totalFraction,
+                              carbsPercent: carbsPercent,
+                              proteinPercent: proteinPercent,
+                              fatPercent: fatPercent,
+                            ),
                           ),
-                          const Column(
+                          Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                '1,320',
-                                style: TextStyle(
+                                '$_consumedKcal',
+                                style: const TextStyle(
                                   fontSize: 24,
                                   fontWeight: FontWeight.bold,
                                   color: Color(0xFF2D3748),
                                 ),
                               ),
                               Text(
-                                '2000 Cal',
-                                style: TextStyle(
+                                '$_goalKcal Cal',
+                                style: const TextStyle(
                                   fontSize: 12,
                                   color: Colors.grey,
                                 ),
@@ -119,34 +208,38 @@ class HomeContent extends StatelessWidget {
                       children: [
                         _buildLegendItem(
                           const Color(0xFFF2A65A),
-                          '150g',
+                          '${_consumedCarbs}g',
                           'Carbs',
                         ),
                         const SizedBox(height: 12),
                         _buildLegendItem(
                           const Color(0xFF5A92D6),
-                          '98g',
+                          '${_consumedProtein}g',
                           'Protein',
                         ),
                         const SizedBox(height: 12),
-                        _buildLegendItem(const Color(0xFF4A8B5C), '41g', 'Fat'),
+                        _buildLegendItem(
+                          const Color(0xFF4A8B5C),
+                          '${_consumedFat}g',
+                          'Fat',
+                        ),
                       ],
                     ),
                   ],
                 ),
                 const SizedBox(height: 20),
                 RichText(
-                  text: const TextSpan(
+                  text: TextSpan(
                     children: [
                       TextSpan(
-                        text: '753 kcal ',
-                        style: TextStyle(
+                        text: '$remainingKcal kcal ',
+                        style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF2D3748),
                           fontSize: 14,
                         ),
                       ),
-                      TextSpan(
+                      const TextSpan(
                         text: 'remaining',
                         style: TextStyle(color: Colors.grey, fontSize: 14),
                       ),
@@ -174,7 +267,6 @@ class HomeContent extends StatelessWidget {
               Expanded(
                 child: GestureDetector(
                   onTap: () {
-                    // Switch to Log Meal tab in MainShell
                     MainShellScope.of(context)?.setIndex(2);
                   },
                   child: _buildQuickActionCard(
@@ -188,22 +280,32 @@ class HomeContent extends StatelessWidget {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _buildQuickActionCard(
-                  icon: Icons.camera_alt,
-                  iconColor: Colors.white,
-                  iconBgColor: const Color(0xFF8B9CB6),
-                  title: 'Analyze Food',
-                  subtitle: 'Get nutritional info',
+                child: GestureDetector(
+                  onTap: () {
+                    MainShellScope.of(context)?.setIndex(2);
+                  },
+                  child: _buildQuickActionCard(
+                    icon: Icons.camera_alt,
+                    iconColor: Colors.white,
+                    iconBgColor: const Color(0xFF8B9CB6),
+                    title: 'Analyze Food',
+                    subtitle: 'Get nutritional info',
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _buildQuickActionCard(
-                  icon: Icons.auto_awesome,
-                  iconColor: Colors.white,
-                  iconBgColor: const Color(0xFF4A8B5C),
-                  title: 'Healthy Recipe',
-                  subtitle: 'AI-suggested alternative',
+                child: GestureDetector(
+                  onTap: () {
+                    MainShellScope.of(context)?.setIndex(3);
+                  },
+                  child: _buildQuickActionCard(
+                    icon: Icons.auto_awesome,
+                    iconColor: Colors.white,
+                    iconBgColor: const Color(0xFF4A8B5C),
+                    title: 'Healthy Recipe',
+                    subtitle: 'AI-suggested alternatives',
+                  ),
                 ),
               ),
             ],
@@ -220,14 +322,6 @@ class HomeContent extends StatelessWidget {
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: Color(0xFF2D3748),
-                ),
-              ),
-              Text(
-                'View All Tips >',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.green[700],
                 ),
               ),
             ],
@@ -256,7 +350,7 @@ class HomeContent extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Eat more leafy greens!',
+                        'Keep it balanced!',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -265,7 +359,7 @@ class HomeContent extends StatelessWidget {
                       ),
                       SizedBox(height: 4),
                       Text(
-                        "They're low in calories but high in nutrients like vitamin K, vitamin C, and fiber.",
+                        "Try to hit your goal ratios. Keep your carbs near 50%, protein near 30%, and fat near 20% for stable daily energy.",
                         style: TextStyle(
                           fontSize: 13,
                           color: Colors.grey,
@@ -370,6 +464,18 @@ class HomeContent extends StatelessWidget {
 
 // ── Custom Painter ────────────────────────────────────────────────────────────
 class NutritionChartPainter extends CustomPainter {
+  final double totalFraction;
+  final double carbsPercent;
+  final double proteinPercent;
+  final double fatPercent;
+
+  NutritionChartPainter({
+    required this.totalFraction,
+    required this.carbsPercent,
+    required this.proteinPercent,
+    required this.fatPercent,
+  });
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
@@ -384,39 +490,47 @@ class NutritionChartPainter extends CustomPainter {
     paint.color = Colors.grey.shade200;
     canvas.drawCircle(center, radius, paint);
 
-    const double startAngle = -math.pi / 2;
+    if (totalFraction == 0) return;
 
+    const double startAngle = -math.pi / 2;
+    final double totalSweep = 2 * math.pi * totalFraction;
+
+    const double gap = 0.05; // gap between segments for beautiful premium look
+
+    // Carbs (orange)
     paint.color = const Color(0xFFF2A65A);
-    const orangeSweep = math.pi * 0.9;
+    final carbsSweep = totalSweep * carbsPercent;
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       startAngle,
-      orangeSweep,
+      (carbsSweep - gap).clamp(0.0, 2 * math.pi),
       false,
       paint,
     );
 
+    // Protein (blue)
     paint.color = const Color(0xFF5A92D6);
-    const blueSweep = math.pi * 0.5;
+    final proteinSweep = totalSweep * proteinPercent;
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
-      startAngle + orangeSweep + 0.1,
-      blueSweep,
+      startAngle + carbsSweep,
+      (proteinSweep - gap).clamp(0.0, 2 * math.pi),
       false,
       paint,
     );
 
+    // Fat (green)
     paint.color = const Color(0xFF4A8B5C);
-    const greenSweep = math.pi * 0.4;
+    final fatSweep = totalSweep * fatPercent;
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
-      startAngle + orangeSweep + blueSweep + 0.2,
-      greenSweep,
+      startAngle + carbsSweep + proteinSweep,
+      (fatSweep - gap).clamp(0.0, 2 * math.pi),
       false,
       paint,
     );
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

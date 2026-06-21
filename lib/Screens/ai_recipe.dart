@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'ai_recipe_detailed.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'main_shell.dart';
+
+
 
 class AiRecipeAlternativeContent extends StatefulWidget {
   const AiRecipeAlternativeContent({super.key});
@@ -13,6 +17,7 @@ class _AiRecipeAlternativeContentState
     extends State<AiRecipeAlternativeContent> {
   late final PageController _pageController;
   int _currentPage = 0;
+  String _goalKcal = '2,000';
 
   static const Color _primaryGreen = Color(0xFF4A8B5C);
   static const Color _darkButtonGreen = Color(0xFF2C5E3B);
@@ -83,6 +88,14 @@ class _AiRecipeAlternativeContentState
   void initState() {
     super.initState();
     _pageController = PageController();
+    _loadGoalKcal();
+  }
+
+  Future<void> _loadGoalKcal() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _goalKcal = prefs.getString('Calories') ?? '2,000';
+    });
   }
 
   @override
@@ -93,6 +106,21 @@ class _AiRecipeAlternativeContentState
 
   @override
   Widget build(BuildContext context) {
+    final scope = MainShellScope.of(context);
+    
+    // Original meal data
+    final Map<String, dynamic> originalMeal = scope?.currentAnalyzedMeal ?? _originalMeal;
+    
+    // Alternative recipes list
+    final List<Map<String, dynamic>> alternatives = 
+        scope != null && scope.currentAlternatives.isNotEmpty 
+            ? scope.currentAlternatives 
+            : _alternatives;
+
+    // Safety checks for active page index
+    final int alternativesCount = alternatives.length;
+    final int safeCurrentPage = _currentPage.clamp(0, alternativesCount > 0 ? alternativesCount - 1 : 0);
+
     return SingleChildScrollView(
       padding: const EdgeInsets.only(
         left: 20,
@@ -142,7 +170,9 @@ class _AiRecipeAlternativeContentState
                         ),
                       ),
                       Text(
-                        'Healthier options for your original meal',
+                        scope != null && scope.currentAlternatives.isNotEmpty
+                            ? 'Tailored custom alternatives for your meal'
+                            : 'Healthier options for your original meal',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey.shade500,
@@ -183,7 +213,7 @@ class _AiRecipeAlternativeContentState
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        _originalMeal['name'],
+                        originalMeal['name'] ?? 'Grilled chicken with brown rice and salad',
                         style: const TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
@@ -199,26 +229,25 @@ class _AiRecipeAlternativeContentState
                   children: [
                     _buildOriginalMacroBadge(
                       label: 'Calories',
-                      value:
-                          '${_originalMeal['kcal']}/${_originalMeal['goalKcal']}',
+                      value: '${originalMeal['kcal'] ?? 620}/${originalMeal['goalKcal'] ?? _goalKcal}',
                       icon: Icons.local_fire_department_rounded,
                       themeColor: const Color(0xFFF2A65A),
                     ),
                     _buildOriginalMacroBadge(
                       label: 'Protein',
-                      value: _originalMeal['protein'],
+                      value: originalMeal['protein'] is int ? '${originalMeal['protein']}g' : (originalMeal['protein'] ?? '98g'),
                       icon: Icons.thumb_up_rounded,
                       themeColor: const Color(0xFF5A92D6),
                     ),
                     _buildOriginalMacroBadge(
                       label: 'Carbs',
-                      value: _originalMeal['carbs'],
+                      value: originalMeal['carbs'] is int ? '${originalMeal['carbs']}g' : (originalMeal['carbs'] ?? '150g'),
                       icon: Icons.grain_rounded,
                       themeColor: const Color(0xFF4A8B5C),
                     ),
                     _buildOriginalMacroBadge(
                       label: 'Fat',
-                      value: _originalMeal['fat'],
+                      value: originalMeal['fat'] is int ? '${originalMeal['fat']}g' : (originalMeal['fat'] ?? '41g'),
                       icon: Icons.opacity_rounded,
                       themeColor: const Color(0xFFEF9A9A),
                     ),
@@ -244,7 +273,7 @@ class _AiRecipeAlternativeContentState
               Row(
                 children: [
                   Text(
-                    '${_currentPage + 1} / ${_alternatives.length}',
+                    '${alternativesCount > 0 ? safeCurrentPage + 1 : 0} / $alternativesCount',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -276,9 +305,9 @@ class _AiRecipeAlternativeContentState
                   _currentPage = page;
                 });
               },
-              itemCount: _alternatives.length,
+              itemCount: alternativesCount,
               itemBuilder: (context, index) {
-                final recipe = _alternatives[index];
+                final recipe = alternatives[index];
                 return _buildAlternativeCard(recipe);
               },
             ),
@@ -289,14 +318,14 @@ class _AiRecipeAlternativeContentState
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(
-              _alternatives.length,
+              alternativesCount,
               (index) => AnimatedContainer(
                 duration: const Duration(milliseconds: 250),
                 margin: const EdgeInsets.symmetric(horizontal: 4),
                 height: 6,
-                width: _currentPage == index ? 16 : 6,
+                width: safeCurrentPage == index ? 16 : 6,
                 decoration: BoxDecoration(
-                  color: _currentPage == index
+                  color: safeCurrentPage == index
                       ? _primaryGreen
                       : Colors.grey.shade300,
                   borderRadius: BorderRadius.circular(3),
@@ -349,7 +378,15 @@ class _AiRecipeAlternativeContentState
   }
 
   void _nextPage() {
-    if (_currentPage < _alternatives.length - 1) {
+    final scope = MainShellScope.of(context);
+    final List<Map<String, dynamic>> alternatives = 
+        scope != null && scope.currentAlternatives.isNotEmpty 
+            ? scope.currentAlternatives 
+            : _alternatives;
+    
+    if (alternatives.isEmpty) return;
+
+    if (_currentPage < alternatives.length - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,

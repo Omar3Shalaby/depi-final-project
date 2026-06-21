@@ -6,21 +6,35 @@ import 'history.dart';
 import 'profile.dart';
 import 'ai_recipe.dart'; // 1. Imported the new AI recipe file
 
-/// Exposes MainShell's tab-switching to child content widgets.
+/// Exposes MainShell's tab-switching and AI states to child content widgets.
 class MainShellScope extends InheritedWidget {
   const MainShellScope({
     super.key,
+    required this.currentIndex,
     required this.setIndex,
+    required this.currentAnalyzedMeal,
+    required this.updateAnalyzedMeal,
+    required this.currentAlternatives,
+    required this.updateAlternatives,
     required super.child,
   });
 
+  final int currentIndex;
   final void Function(int) setIndex;
+  final Map<String, dynamic>? currentAnalyzedMeal;
+  final void Function(Map<String, dynamic>?) updateAnalyzedMeal;
+  final List<Map<String, dynamic>> currentAlternatives;
+  final void Function(List<Map<String, dynamic>>) updateAlternatives;
 
   static MainShellScope? of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<MainShellScope>();
 
   @override
-  bool updateShouldNotify(MainShellScope oldWidget) => false;
+  bool updateShouldNotify(MainShellScope oldWidget) {
+    return oldWidget.currentIndex != currentIndex ||
+        oldWidget.currentAnalyzedMeal != currentAnalyzedMeal ||
+        oldWidget.currentAlternatives != currentAlternatives;
+  }
 }
 
 /// The persistent shell: owns the background image and nav bar.
@@ -34,15 +48,30 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
+  Map<String, dynamic>? _currentAnalyzedMeal;
+  List<Map<String, dynamic>> _currentAlternatives = [];
 
   void _setIndex(int index) {
     if (_currentIndex != index) setState(() => _currentIndex = index);
   }
 
+  void _updateAnalyzedMeal(Map<String, dynamic>? meal) {
+    setState(() => _currentAnalyzedMeal = meal);
+  }
+
+  void _updateAlternatives(List<Map<String, dynamic>> alternatives) {
+    setState(() => _currentAlternatives = alternatives);
+  }
+
   @override
   Widget build(BuildContext context) {
     return MainShellScope(
+      currentIndex: _currentIndex,
       setIndex: _setIndex,
+      currentAnalyzedMeal: _currentAnalyzedMeal,
+      updateAnalyzedMeal: _updateAnalyzedMeal,
+      currentAlternatives: _currentAlternatives,
+      updateAlternatives: _updateAlternatives,
       child: Scaffold(
         body: Container(
           width: double.infinity,
@@ -59,11 +88,11 @@ class _MainShellState extends State<MainShell> {
                 // ── Page content (no animation, instant swap) ──────────
                 IndexedStack(
                   index: _currentIndex,
-                  children: const [
+                  children: [
                     HomeContent(),      // index 0
                     HistoryContent(),   // index 1
                     LogMealContent(),   // index 2
-                    AiRecipeAlternativeContent(), // 2. Replaced the stub here (index 3)
+                    AiRecipeAlternativeContent(), // index 3
                     ProfileContent(),   // index 4
                     MealDetailsScreen(), // index 5
                   ],

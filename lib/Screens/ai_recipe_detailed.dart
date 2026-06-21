@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:nutri_vision/services/storage_service.dart';
+
 
 class AiRecipeDetailsScreen extends StatefulWidget {
   final Map<String, dynamic>? recipeData;
@@ -379,14 +381,28 @@ class _AiRecipeDetailsScreenState extends State<AiRecipeDetailsScreen> {
                           end: Alignment.bottomCenter,
                         ),
                       ),
-                      child: ElevatedButton(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Meal added to plan!'),
-                              backgroundColor: _primaryGreen,
-                            ),
-                          );
+                       child: ElevatedButton(
+                        onPressed: () async {
+                          final Map<String, dynamic> mealData = {
+                            'name': _recipe['title'],
+                            'kcal': int.tryParse(_recipe['kcal'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 400,
+                            'protein': int.tryParse(_recipe['protein'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 30,
+                            'carbs': int.tryParse(_recipe['carbs'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 40,
+                            'fat': int.tryParse(_recipe['fat'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 10,
+                          };
+                          await StorageService.saveMeal(DateTime.now(), mealData);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Recipe added to your logged meals!'),
+                                backgroundColor: _primaryGreen,
+                              ),
+                            );
+                            // Wait briefly and pop
+                            Future.delayed(const Duration(milliseconds: 500), () {
+                              if (mounted) Navigator.pop(context);
+                            });
+                          }
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,

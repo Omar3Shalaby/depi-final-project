@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:nutri_vision/Screens/main_shell.dart';
+import 'package:nutri_vision/services/ai_service.dart';
 
 /// Pure content widget — Scaffold, background & nav bar live in MainShell.
 class LogMealContent extends StatefulWidget {
@@ -11,6 +12,13 @@ class LogMealContent extends StatefulWidget {
 
 class _LogMealContentState extends State<LogMealContent> {
   bool _isAnalyzing = false;
+  final TextEditingController _mealTextController = TextEditingController();
+
+  @override
+  void dispose() {
+    _mealTextController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -79,6 +87,7 @@ class _LogMealContentState extends State<LogMealContent> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       TextField(
+                        controller: _mealTextController,
                         maxLines: 4,
                         decoration: InputDecoration(
                           hintText:
@@ -109,10 +118,44 @@ class _LogMealContentState extends State<LogMealContent> {
                   width: double.infinity,
                   height: 54,
                   child: ElevatedButton(
-                    onPressed: () {
-                      setState(() => _isAnalyzing = !_isAnalyzing);
-                      MainShellScope.of(context)?.setIndex(5);
-                    },
+                    onPressed: _isAnalyzing
+                        ? null
+                        : () async {
+                            final text = _mealTextController.text.trim();
+                            if (text.isEmpty) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Please describe your meal first.'),
+                                  backgroundColor: Colors.redAccent,
+                                ),
+                              );
+                              return;
+                            }
+                            setState(() => _isAnalyzing = true);
+                            try {
+                              final result = await AiService.analyzeMealText(text);
+                              if (mounted) {
+                                final scope = MainShellScope.of(context);
+                                scope?.updateAnalyzedMeal(result);
+                                scope?.updateAlternatives([]); // Reset old recipe suggestions
+                                scope?.setIndex(5); // Navigate to Meal Details screen
+                                _mealTextController.clear(); // Clear text field
+                              }
+                            } catch (e) {
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error analyzing meal: $e'),
+                                    backgroundColor: Colors.redAccent,
+                                  ),
+                                );
+                              }
+                            } finally {
+                              if (mounted) {
+                                setState(() => _isAnalyzing = false);
+                              }
+                            }
+                          },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF4A8B5C),
                       shape: RoundedRectangleBorder(
@@ -120,14 +163,23 @@ class _LogMealContentState extends State<LogMealContent> {
                       ),
                       elevation: 0,
                     ),
-                    child: const Text(
-                      'Analyze Meal',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
+                    child: _isAnalyzing
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                            'Analyze Meal',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
                   ),
                 ),
 

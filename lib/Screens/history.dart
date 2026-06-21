@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:nutri_vision/services/storage_service.dart';
+import 'main_shell.dart';
 
 /// Pure content widget — Scaffold, background & nav bar live in MainShell.
 class HistoryContent extends StatefulWidget {
@@ -9,66 +12,87 @@ class HistoryContent extends StatefulWidget {
 }
 
 class _HistoryContentState extends State<HistoryContent> {
-  // Simulated current date offset for the date navigator
-  int _dayOffset = 0;
+  // The selected date for the navigator (defaults to today)
+  DateTime _selectedDate = DateTime.now();
+  List<Map<String, dynamic>> _meals = [];
+  bool _isLoading = true;
+  int _goalKcal = 2000;
+  int? _lastIndex;
 
-  String get _dateLabel {
-    if (_dayOffset == 0) return 'Today, April 24';
-    if (_dayOffset == -1) return 'Yesterday, April 23';
-    if (_dayOffset == 1) return 'Tomorrow, April 25';
-    final day = 24 + _dayOffset;
-    return 'April $day';
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
   }
 
-  // Sample meal data
-  final List<Map<String, dynamic>> _meals = [
-    {
-      'name': 'Breakfast',
-      'time': '8:30 AM',
-      'kcal': 350,
-      'carbs': 45,
-      'protein': 18,
-      'fat': 12,
-      'icon': Icons.egg_alt_rounded,
-      'color': Color(0xFFFFF3E0),
-      'iconColor': Color(0xFFF2A65A),
-      'checked': false,
-    },
-    {
-      'name': 'Lunch',
-      'time': '1:15 PM',
-      'kcal': 620,
-      'carbs': 55,
-      'protein': 42,
-      'fat': 18,
-      'icon': Icons.rice_bowl_rounded,
-      'color': Color(0xFFE8F5E9),
-      'iconColor': Color(0xFF4A8B5C),
-      'checked': true,
-    },
-    {
-      'name': 'Dinner',
-      'time': '7:45 PM',
-      'kcal': 350,
-      'carbs': 50,
-      'protein': 22,
-      'fat': 11,
-      'icon': Icons.dinner_dining_rounded,
-      'color': Color(0xFFE3F2FD),
-      'iconColor': Color(0xFF5A92D6),
-      'checked': false,
-    },
-  ];
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reload when the user navigates back to the History tab (index 1)
+    final scope = MainShellScope.of(context);
+    if (scope != null && scope.currentIndex == 1 && _lastIndex != 1) {
+      _loadData();
+    }
+    _lastIndex = scope?.currentIndex;
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    final prefs = await SharedPreferences.getInstance();
+    final meals = await StorageService.getMealsForDate(_selectedDate);
+
+    setState(() {
+      _meals = meals;
+      _goalKcal = int.tryParse(prefs.getString('Calories') ?? '2000') ?? 2000;
+      _isLoading = false;
+    });
+  }
+
+  void _changeDay(int delta) {
+    setState(() {
+      _selectedDate = _selectedDate.add(Duration(days: delta));
+    });
+    _loadData();
+  }
+
+  String get _dateLabel {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final selected = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+    final diff = selected.difference(today).inDays;
+
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+
+    final monthName = months[_selectedDate.month - 1];
+    final day = _selectedDate.day;
+
+    if (diff == 0) return 'Today, $monthName $day';
+    if (diff == -1) return 'Yesterday, $monthName $day';
+    if (diff == 1) return 'Tomorrow, $monthName $day';
+    return '$monthName $day';
+  }
 
   int get _totalKcal =>
-      _meals.fold(0, (sum, m) => sum + (m['kcal'] as int));
+      _meals.fold(0, (sum, m) => sum + (m['kcal'] as num).toInt());
   int get _totalProtein =>
-      _meals.fold(0, (sum, m) => sum + (m['protein'] as int));
+      _meals.fold(0, (sum, m) => sum + (m['protein'] as num).toInt());
   int get _totalCarbs =>
-      _meals.fold(0, (sum, m) => sum + (m['carbs'] as int));
+      _meals.fold(0, (sum, m) => sum + (m['carbs'] as num).toInt());
   int get _totalFat =>
-      _meals.fold(0, (sum, m) => sum + (m['fat'] as int));
-  static const int _goalKcal = 2000;
+      _meals.fold(0, (sum, m) => sum + (m['fat'] as num).toInt());
+
+  Future<void> _deleteMeal(String id) async {
+    await StorageService.deleteMeal(_selectedDate, id);
+    _loadData();
+  }
+
+  Future<void> _toggleMealChecked(String id) async {
+    await StorageService.toggleMealChecked(_selectedDate, id);
+    _loadData();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -144,10 +168,34 @@ class _HistoryContentState extends State<HistoryContent> {
                     ),
                   ],
                 ),
-                child: const Icon(
-                  Icons.calendar_view_week_rounded,
-                  color: Color(0xFF4A8B5C),
-                  size: 20,
+                child: GestureDetector(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _selectedDate,
+                      firstDate: DateTime(2024),
+                      lastDate: DateTime.now().add(const Duration(days: 1)),
+                      builder: (context, child) {
+                        return Theme(
+                          data: Theme.of(context).copyWith(
+                            colorScheme: const ColorScheme.light(
+                              primary: Color(0xFF4A8B5C),
+                            ),
+                          ),
+                          child: child!,
+                        );
+                      },
+                    );
+                    if (picked != null) {
+                      setState(() => _selectedDate = picked);
+                      _loadData();
+                    }
+                  },
+                  child: const Icon(
+                    Icons.calendar_view_week_rounded,
+                    color: Color(0xFF4A8B5C),
+                    size: 20,
+                  ),
                 ),
               ),
             ],
@@ -172,7 +220,7 @@ class _HistoryContentState extends State<HistoryContent> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 GestureDetector(
-                  onTap: () => setState(() => _dayOffset--),
+                  onTap: () => _changeDay(-1),
                   child: const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
                     child: Icon(Icons.chevron_left_rounded,
@@ -188,7 +236,7 @@ class _HistoryContentState extends State<HistoryContent> {
                   ),
                 ),
                 GestureDetector(
-                  onTap: () => setState(() => _dayOffset++),
+                  onTap: () => _changeDay(1),
                   child: const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
                     child: Icon(Icons.chevron_right_rounded,
@@ -263,7 +311,10 @@ class _HistoryContentState extends State<HistoryContent> {
                 ),
               ),
               GestureDetector(
-                onTap: () {},
+                onTap: () {
+                  // Navigate to Log Meal tab
+                  MainShellScope.of(context)?.setIndex(2);
+                },
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 14, vertical: 8),
@@ -291,86 +342,129 @@ class _HistoryContentState extends State<HistoryContent> {
           ),
           const SizedBox(height: 12),
 
-          // ── Meal Cards ────────────────────────────────────────
-          ..._meals.map((meal) => _MealCard(meal: meal)),
+          // ── Meal Cards (dynamic) ───────────────────────────────
+          if (_isLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 40),
+                child: CircularProgressIndicator(
+                  color: Color(0xFF4A8B5C),
+                ),
+              ),
+            )
+          else if (_meals.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.no_meals_rounded,
+                      size: 56,
+                      color: Colors.grey.shade300,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'No meals logged for this day',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.grey.shade500,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Tap "Add Meal" to log your first meal',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade400,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ..._meals.map((meal) => _MealCard(
+                  meal: meal,
+                  onToggleChecked: () =>
+                      _toggleMealChecked(meal['id']?.toString() ?? ''),
+                  onDelete: () =>
+                      _deleteMeal(meal['id']?.toString() ?? ''),
+                )),
           const SizedBox(height: 20),
 
           // ── Daily Summary Card ────────────────────────────────
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Daily Summary',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF2D3748),
+          if (!_isLoading && _meals.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Daily Summary',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF2D3748),
+                        ),
                       ),
-                    ),
-                    Text(
-                      'See Details >',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.green[700],
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '$_totalKcal / $_goalKcal kcal',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF2D3748),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '$_totalKcal / $_goalKcal kcal',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF2D3748),
+                      Text(
+                        '${_goalKcal > 0 ? ((_totalKcal / _goalKcal) * 100).toStringAsFixed(0) : 0}%',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF2D3748),
+                        ),
                       ),
-                    ),
-                    Text(
-                      '${((_totalKcal / _goalKcal) * 100).toStringAsFixed(0)}%',
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF2D3748),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  // Progress Bar
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: _goalKcal > 0
+                          ? (_totalKcal / _goalKcal).clamp(0.0, 1.0)
+                          : 0.0,
+                      minHeight: 10,
+                      backgroundColor: Colors.grey.shade100,
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Color(0xFF4A8B5C),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                // Progress Bar
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    value: (_totalKcal / _goalKcal).clamp(0.0, 1.0),
-                    minHeight: 10,
-                    backgroundColor: Colors.grey.shade100,
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                      Color(0xFF4A8B5C),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -410,12 +504,70 @@ class _HistoryContentState extends State<HistoryContent> {
 
 // ── Meal Card ─────────────────────────────────────────────────────────────────
 class _MealCard extends StatelessWidget {
-  const _MealCard({required this.meal});
+  const _MealCard({
+    required this.meal,
+    required this.onToggleChecked,
+    required this.onDelete,
+  });
   final Map<String, dynamic> meal;
+  final VoidCallback onToggleChecked;
+  final VoidCallback onDelete;
+
+  /// Resolve icon from the stored string key
+  IconData _resolveIcon(dynamic iconValue) {
+    if (iconValue is String) {
+      switch (iconValue) {
+        case 'egg':
+          return Icons.egg_alt_rounded;
+        case 'rice':
+          return Icons.rice_bowl_rounded;
+        case 'dinner':
+          return Icons.dinner_dining_rounded;
+        default:
+          return Icons.restaurant_rounded;
+      }
+    }
+    // Fallback for any legacy data that stored IconData directly (not serializable)
+    return Icons.restaurant_rounded;
+  }
+
+  /// Resolve color palette based on icon type
+  Color _resolveIconColor(dynamic iconValue) {
+    if (iconValue is String) {
+      switch (iconValue) {
+        case 'egg':
+          return const Color(0xFFF2A65A);
+        case 'rice':
+          return const Color(0xFF4A8B5C);
+        case 'dinner':
+          return const Color(0xFF5A92D6);
+        default:
+          return const Color(0xFF8B9CB6);
+      }
+    }
+    return const Color(0xFF8B9CB6);
+  }
+
+  Color _resolveBgColor(dynamic iconValue) {
+    if (iconValue is String) {
+      switch (iconValue) {
+        case 'egg':
+          return const Color(0xFFFFF3E0);
+        case 'rice':
+          return const Color(0xFFE8F5E9);
+        case 'dinner':
+          return const Color(0xFFE3F2FD);
+        default:
+          return const Color(0xFFF0F4F8);
+      }
+    }
+    return const Color(0xFFF0F4F8);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final bool isChecked = meal['checked'] as bool;
+    final bool isChecked = meal['checked'] == true;
+    final iconKey = meal['icon'];
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -438,12 +590,12 @@ class _MealCard extends StatelessWidget {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: meal['color'] as Color,
+              color: _resolveBgColor(iconKey),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(
-              meal['icon'] as IconData,
-              color: meal['iconColor'] as Color,
+              _resolveIcon(iconKey),
+              color: _resolveIconColor(iconKey),
               size: 28,
             ),
           ),
@@ -456,17 +608,20 @@ class _MealCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(
-                      meal['name'] as String,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                        color: Color(0xFF2D3748),
+                    Flexible(
+                      child: Text(
+                        meal['name'] as String? ?? 'Meal',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: Color(0xFF2D3748),
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      meal['time'] as String,
+                      meal['time'] as String? ?? '',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey.shade500,
@@ -495,19 +650,65 @@ class _MealCard extends StatelessWidget {
             ),
           ),
 
-          // Checked indicator or more options
-          if (isChecked)
-            Container(
-              width: 28,
-              height: 28,
-              decoration: const BoxDecoration(
-                color: Color(0xFF4A8B5C),
-                shape: BoxShape.circle,
+          // Actions
+          Column(
+            children: [
+              // Toggle checked
+              GestureDetector(
+                onTap: onToggleChecked,
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: isChecked
+                        ? const Color(0xFF4A8B5C)
+                        : Colors.grey.shade200,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isChecked ? Icons.check : Icons.check,
+                    color: isChecked ? Colors.white : Colors.grey.shade400,
+                    size: 16,
+                  ),
+                ),
               ),
-              child: const Icon(Icons.check, color: Colors.white, size: 16),
-            )
-          else
-            Icon(Icons.more_vert_rounded, color: Colors.grey.shade400),
+              const SizedBox(height: 8),
+              // Delete
+              GestureDetector(
+                onTap: () {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Delete Meal'),
+                      content: Text(
+                          'Remove "${meal['name']}" from your log?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            onDelete();
+                          },
+                          child: const Text(
+                            'Delete',
+                            style: TextStyle(color: Colors.red),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+                child: Icon(
+                  Icons.delete_outline_rounded,
+                  color: Colors.grey.shade400,
+                  size: 20,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

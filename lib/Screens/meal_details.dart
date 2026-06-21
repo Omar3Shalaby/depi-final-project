@@ -1,35 +1,131 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
-
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:nutri_vision/Screens/main_shell.dart';
+import 'package:nutri_vision/services/storage_service.dart';
+import 'package:nutri_vision/services/ai_service.dart';
 
-
-
-void main() {
-  runApp(const NutritionApp());
-}
-
-class NutritionApp extends StatelessWidget {
-  const NutritionApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        fontFamily: 'PlusJakartaSans',
-        scaffoldBackgroundColor: const Color(0xFFF1F5F2),
-      ),
-      home: const MealDetailsScreen(),
-    );
-  }
-}
-
-class MealDetailsScreen extends StatelessWidget {
+class MealDetailsScreen extends StatefulWidget {
   const MealDetailsScreen({super.key});
 
   @override
+  State<MealDetailsScreen> createState() => _MealDetailsScreenState();
+}
+
+class _MealDetailsScreenState extends State<MealDetailsScreen> {
+  bool _isGeneratingAlternatives = false;
+  double _goalProtein = 150.0;
+  double _goalCarbs = 250.0;
+  double _goalFat = 60.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDailyGoals();
+  }
+
+  Future<void> _loadDailyGoals() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _goalProtein = double.tryParse(prefs.getString('Protein') ?? '150') ?? 150.0;
+      _goalCarbs = double.tryParse(prefs.getString('Carbs') ?? '250') ?? 250.0;
+      _goalFat = double.tryParse(prefs.getString('Fat') ?? '60') ?? 60.0;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final scope = MainShellScope.of(context);
+    final meal = scope?.currentAnalyzedMeal;
+
+    if (meal == null) {
+      return Scaffold(
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFFE8F2EC), Color(0xFFF1F5F2)],
+            ),
+          ),
+          child: SafeArea(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.restaurant_menu_rounded,
+                        color: Color(0xFF4A8B5C),
+                        size: 64,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'No Meal Analyzed Yet',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF333333),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Go to the Log Meal tab to describe what you ate and get a dynamic AI analysis of your nutrition.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: () => scope?.setIndex(2),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Log A Meal'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4A8B5C),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(200, 50),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final String name = meal['name'] ?? 'Analyzed Meal';
+    final int kcal = meal['kcal'] is int ? meal['kcal'] : int.tryParse(meal['kcal'].toString()) ?? 0;
+    final int protein = meal['protein'] is int ? meal['protein'] : int.tryParse(meal['protein'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    final int carbs = meal['carbs'] is int ? meal['carbs'] : int.tryParse(meal['carbs'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    final int fat = meal['fat'] is int ? meal['fat'] : int.tryParse(meal['fat'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    final String description = meal['description'] ?? '';
+
+    // Calculate percentages for donut chart
+    final double carbsKcal = carbs * 4.0;
+    final double proteinKcal = protein * 4.0;
+    final double fatKcal = fat * 9.0;
+    final double totalKcalCalculated = carbsKcal + proteinKcal + fatKcal;
+
+    final double carbsPercent = totalKcalCalculated > 0 ? (carbsKcal / totalKcalCalculated) : 0.33;
+    final double proteinPercent = totalKcalCalculated > 0 ? (proteinKcal / totalKcalCalculated) : 0.33;
+    final double fatPercent = totalKcalCalculated > 0 ? (fatKcal / totalKcalCalculated) : 0.34;
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -43,9 +139,8 @@ class MealDetailsScreen extends StatelessWidget {
         child: SafeArea(
           child: Stack(
             children: [
-              // Main Scrollable Content
               SingleChildScrollView(
-                padding: const EdgeInsets.only(bottom: 20),
+                padding: const EdgeInsets.only(bottom: 120),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -55,12 +150,12 @@ class MealDetailsScreen extends StatelessWidget {
                       child: Row(
                         children: [
                           GestureDetector(
-                            onTap: () => MainShellScope.of(context)?.setIndex(2),
-                            child: const Icon(Icons.arrow_back, color: Color(0xFF3B694D),),
+                            onTap: () => scope?.setIndex(2),
+                            child: const Icon(Icons.arrow_back, color: Color(0xFF3B694D)),
                           ),
                           const SizedBox(width: 16),
                           const Text(
-                            'Meal Details',
+                            'Meal Analysis',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
@@ -68,14 +163,6 @@ class MealDetailsScreen extends StatelessWidget {
                             ),
                           ),
                           const Spacer(),
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.3),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -87,28 +174,46 @@ class MealDetailsScreen extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(32),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 15,
+                              offset: const Offset(0, 5),
+                            )
+                          ]
                         ),
                         padding: const EdgeInsets.all(24),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Meal Details',
+                              'AI Analysis Result',
                               style: TextStyle(
-                                fontSize: 24,
+                                fontSize: 22,
                                 fontWeight: FontWeight.w700,
                                 color: Color(0xFF333333),
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              'Grilled chicken with brown rice and salad',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Color(0xFF666666),
-                                height: 1.4,
+                            const SizedBox(height: 12),
+                            Text(
+                              name,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF4A8B5C),
                               ),
                             ),
+                            if (description.isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                description,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF666666),
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 24),
 
                             // Calories Banner
@@ -122,28 +227,28 @@ class MealDetailsScreen extends StatelessWidget {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   const Text(
-                                    'Calories:',
+                                    'Estimated Calories:',
                                     style: TextStyle(
-                                      fontSize: 18,
+                                      fontSize: 16,
                                       fontWeight: FontWeight.w600,
                                       color: Color(0xFF333333),
                                     ),
                                   ),
                                   RichText(
-                                    text: const TextSpan(
+                                    text: TextSpan(
                                       children: [
                                         TextSpan(
-                                          text: '620 ',
-                                          style: TextStyle(
-                                            fontSize: 20,
+                                          text: '$kcal ',
+                                          style: const TextStyle(
+                                            fontSize: 22,
                                             fontWeight: FontWeight.w700,
                                             color: Color(0xFF333333),
                                           ),
                                         ),
-                                        TextSpan(
+                                        const TextSpan(
                                           text: 'kcal',
                                           style: TextStyle(
-                                            fontSize: 16,
+                                            fontSize: 15,
                                             fontWeight: FontWeight.w400,
                                             color: Color(0xFF666666),
                                           ),
@@ -156,12 +261,12 @@ class MealDetailsScreen extends StatelessWidget {
                             ),
                             const SizedBox(height: 24),
 
-                            // Macro Progress Bars
-                            _buildMacroBar('Protein:', '42g', 0.65, const Color(0xFF64B5F6)),
+                            // Macro Progress Bars (percentage relative to daily goal targets)
+                            _buildMacroBar('Protein:', '${protein}g', (protein / _goalProtein).clamp(0.0, 1.0), const Color(0xFF64B5F6)),
                             const SizedBox(height: 16),
-                            _buildMacroBar('Carbs:', '55g', 0.75, const Color(0xFFFAA325)),
+                            _buildMacroBar('Carbs:', '${carbs}g', (carbs / _goalCarbs).clamp(0.0, 1.0), const Color(0xFFFAA325)),
                             const SizedBox(height: 16),
-                            _buildMacroBar('Fat:', '18g', 0.45, const Color(0xFF54E34F)),
+                            _buildMacroBar('Fat:', '${fat}g', (fat / _goalFat).clamp(0.0, 1.0), const Color(0xFF54E34F)),
 
                             const Padding(
                               padding: EdgeInsets.symmetric(vertical: 24),
@@ -172,30 +277,34 @@ class MealDetailsScreen extends StatelessWidget {
                             Row(
                               children: [
                                 SizedBox(
-                                  width: 140,
-                                  height: 140,
+                                  width: 120,
+                                  height: 120,
                                   child: Stack(
                                     alignment: Alignment.center,
                                     children: [
                                       CustomPaint(
-                                        size: const Size(140, 140),
-                                        painter: DonutChartPainter(),
+                                        size: const Size(120, 120),
+                                        painter: DonutChartPainter(
+                                          carbsPercent: carbsPercent,
+                                          proteinPercent: proteinPercent,
+                                          fatPercent: fatPercent,
+                                        ),
                                       ),
                                       Column(
                                         mainAxisSize: MainAxisSize.min,
-                                        children: const [
+                                        children: [
                                           Text(
-                                            '620',
-                                            style: TextStyle(
-                                              fontSize: 22,
+                                            '$kcal',
+                                            style: const TextStyle(
+                                              fontSize: 20,
                                               fontWeight: FontWeight.w700,
                                               color: Color(0xFF333333),
                                             ),
                                           ),
-                                          Text(
+                                          const Text(
                                             'kcal',
                                             style: TextStyle(
-                                              fontSize: 12,
+                                              fontSize: 11,
                                               color: Color(0xFF666666),
                                             ),
                                           ),
@@ -204,15 +313,15 @@ class MealDetailsScreen extends StatelessWidget {
                                     ],
                                   ),
                                 ),
-                                const SizedBox(width: 32),
+                                const SizedBox(width: 24),
                                 Expanded(
                                   child: Column(
                                     children: [
-                                      _buildLegendItem('Carbs', '36%', const Color(0xFFFAA325)),
-                                      const SizedBox(height: 12),
-                                      _buildLegendItem('Protein', '27%', const Color(0xFF64B5F6)),
-                                      const SizedBox(height: 12),
-                                      _buildLegendItem('Fat', '20%', const Color(0xFF54E34F)),
+                                      _buildLegendItem('Carbs', '${(carbsPercent * 100).toStringAsFixed(0)}%', const Color(0xFFFAA325)),
+                                      const SizedBox(height: 10),
+                                      _buildLegendItem('Protein', '${(proteinPercent * 100).toStringAsFixed(0)}%', const Color(0xFF64B5F6)),
+                                      const SizedBox(height: 10),
+                                      _buildLegendItem('Fat', '${(fatPercent * 100).toStringAsFixed(0)}%', const Color(0xFF54E34F)),
                                     ],
                                   ),
                                 ),
@@ -222,34 +331,87 @@ class MealDetailsScreen extends StatelessWidget {
 
                             // Buttons
                             ElevatedButton(
-                              onPressed: () {},
+                              onPressed: () async {
+                                final now = DateTime.now();
+                                final savedMeal = {
+                                  'name': name,
+                                  'kcal': kcal,
+                                  'protein': protein,
+                                  'carbs': carbs,
+                                  'fat': fat,
+                                };
+                                await StorageService.saveMeal(now, savedMeal);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Meal saved successfully!'),
+                                      backgroundColor: Color(0xFF4A8B5C),
+                                    ),
+                                  );
+                                  scope?.updateAnalyzedMeal(null);
+                                  scope?.setIndex(0); // Go home
+                                }
+                              },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF569C6F),
                                 foregroundColor: Colors.white,
-                                minimumSize: const Size(double.infinity, 60),
+                                minimumSize: const Size(double.infinity, 54),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                                elevation: 4,
-                                shadowColor: const Color(0xFF569C6F).withOpacity(0.4),
-                                textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                                elevation: 2,
+                                textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                               ),
                               child: const Text('Save Meal'),
                             ),
                             const SizedBox(height: 12),
                             OutlinedButton(
-                              onPressed: () {},
+                              onPressed: _isGeneratingAlternatives
+                                  ? null
+                                  : () async {
+                                      setState(() => _isGeneratingAlternatives = true);
+                                      try {
+                                        final recipes = await AiService.generateAlternativeRecipes(name, kcal.toString());
+                                        if (context.mounted) {
+                                          scope?.updateAlternatives(recipes);
+                                          scope?.setIndex(3); // Switch to AI Recipes Tab
+                                        }
+                                      } catch (e) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Error generating alternatives: $e'),
+                                              backgroundColor: Colors.redAccent,
+                                            ),
+                                          );
+                                        }
+                                      } finally {
+                                        if (mounted) {
+                                          setState(() => _isGeneratingAlternatives = false);
+                                        }
+                                      }
+                                    },
                               style: OutlinedButton.styleFrom(
                                 side: const BorderSide(color: Color(0xFFEEEEEE)),
-                                minimumSize: const Size(double.infinity, 60),
+                                minimumSize: const Size(double.infinity, 54),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                                 foregroundColor: const Color(0xFF333333),
-                                textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                                textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                               ),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
-                                children: const [
-                                  Text('Get Healthier Recipe'),
-                                  SizedBox(width: 8),
-                                  Icon(Icons.chevron_right, size: 20),
+                                children: [
+                                  if (_isGeneratingAlternatives)
+                                    const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Color(0xFF333333),
+                                      ),
+                                    )
+                                  else
+                                    const Text('Get Healthier Recipes'),
+                                  const SizedBox(width: 8),
+                                  const Icon(Icons.auto_awesome, size: 20, color: Color(0xFF4A8B5C)),
                                 ],
                               ),
                             ),
@@ -274,24 +436,24 @@ class MealDetailsScreen extends StatelessWidget {
           width: 80,
           child: Text(
             label,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF333333)),
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF333333)),
           ),
         ),
         Expanded(
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
               value: progress,
               backgroundColor: const Color(0xFFF5F5F5),
               color: color,
-              minHeight: 12,
+              minHeight: 10,
             ),
           ),
         ),
         const SizedBox(width: 16),
         Text(
           value,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF333333)),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF333333)),
         ),
       ],
     );
@@ -301,19 +463,19 @@ class MealDetailsScreen extends StatelessWidget {
     return Row(
       children: [
         Container(
-          width: 12,
-          height: 12,
+          width: 10,
+          height: 10,
           decoration: BoxDecoration(shape: BoxShape.circle, color: color),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Text(
           label,
-          style: const TextStyle(fontSize: 14, color: Color(0xFF666666)),
+          style: const TextStyle(fontSize: 13, color: Color(0xFF666666)),
         ),
         const Spacer(),
         Text(
           percent,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF333333)),
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF333333)),
         ),
       ],
     );
@@ -321,12 +483,22 @@ class MealDetailsScreen extends StatelessWidget {
 }
 
 class DonutChartPainter extends CustomPainter {
+  final double carbsPercent;
+  final double proteinPercent;
+  final double fatPercent;
+
+  DonutChartPainter({
+    required this.carbsPercent,
+    required this.proteinPercent,
+    required this.fatPercent,
+  });
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
-    final rect = Rect.fromCircle(center: center, radius: radius - 10);
-    const strokeWidth = 20.0;
+    final rect = Rect.fromCircle(center: center, radius: radius - 8);
+    const strokeWidth = 14.0;
 
     final paint = Paint()
       ..style = PaintingStyle.stroke
@@ -337,19 +509,29 @@ class DonutChartPainter extends CustomPainter {
     paint.color = const Color(0xFFEEEEEE);
     canvas.drawArc(rect, 0, 2 * math.pi, false, paint);
 
+    // Total ratio sum to normalize just in case
+    final double total = carbsPercent + proteinPercent + fatPercent;
+    if (total == 0) return;
+
+    const double startAngle = -math.pi / 2;
+    const double gap = 0.05; // tiny gap for premium segmented look
+
     // Carbs
     paint.color = const Color(0xFFFAA325);
-    canvas.drawArc(rect, -math.pi / 2, 2 * math.pi * 0.36, false, paint);
+    final carbsSweep = (carbsPercent / total) * 2 * math.pi;
+    canvas.drawArc(rect, startAngle, carbsSweep - gap, false, paint);
 
     // Protein
     paint.color = const Color(0xFF64B5F6);
-    canvas.drawArc(rect, -math.pi / 2 + 2 * math.pi * 0.36, 2 * math.pi * 0.27, false, paint);
+    final proteinSweep = (proteinPercent / total) * 2 * math.pi;
+    canvas.drawArc(rect, startAngle + carbsSweep, proteinSweep - gap, false, paint);
 
     // Fat
     paint.color = const Color(0xFF54E34F);
-    canvas.drawArc(rect, -math.pi / 2 + 2 * math.pi * (0.36 + 0.27), 2 * math.pi * 0.20, false, paint);
+    final fatSweep = (fatPercent / total) * 2 * math.pi;
+    canvas.drawArc(rect, startAngle + carbsSweep + proteinSweep, fatSweep - gap, false, paint);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }
