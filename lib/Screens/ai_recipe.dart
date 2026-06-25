@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/meal_model.dart';
-import '../services/storage_service.dart';
 import 'ai_recipe_detailed.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/meal_provider.dart';
