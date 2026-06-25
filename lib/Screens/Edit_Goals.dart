@@ -3,25 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_svg/svg.dart';
 
-void main() {
-  runApp(const NutritionApp());
-}
-
-class NutritionApp extends StatelessWidget {
-  const NutritionApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        textTheme: GoogleFonts.nunitoTextTheme(),
-      ),
-      home: const EditGoalsScreen(),
-    );
-  }
-}
-
 class EditGoalsScreen extends StatefulWidget {
   const EditGoalsScreen({super.key});
 

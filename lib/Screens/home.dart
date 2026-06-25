@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'main_shell.dart';
 import 'package:nutri_vision/services/storage_service.dart';
+import 'package:nutri_vision/providers/app_providers.dart';
 
 /// Pure content widget — Scaffold, background & nav bar live in MainShell.
-class HomeContent extends StatefulWidget {
+class HomeContent extends ConsumerStatefulWidget {
   const HomeContent({super.key});
 
   @override
-  State<HomeContent> createState() => _HomeContentState();
+  ConsumerState<HomeContent> createState() => _HomeContentState();
 }
 
-class _HomeContentState extends State<HomeContent> {
+class _HomeContentState extends ConsumerState<HomeContent> {
   String _displayName = 'Ahmad';
   int _consumedKcal = 0;
   int _consumedCarbs = 0;
@@ -23,22 +24,15 @@ class _HomeContentState extends State<HomeContent> {
 
   int _goalKcal = 2000;
 
-  int? _lastIndex;
-
   @override
   void initState() {
     super.initState();
     _loadData();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final scope = MainShellScope.of(context);
-    if (scope != null && scope.currentIndex == 0 && _lastIndex != 0) {
-      _loadData();
-    }
-    _lastIndex = scope?.currentIndex;
+    ref.listenManual<int>(navigationIndexProvider, (previous, next) {
+      if (next == 0 && previous != 0) {
+        _loadData();
+      }
+    });
   }
 
   Future<void> _loadData() async {
@@ -51,10 +45,10 @@ class _HomeContentState extends State<HomeContent> {
     int fatSum = 0;
 
     for (var m in todayMeals) {
-      kcalSum += (m['kcal'] as num).toInt();
-      carbsSum += (m['carbs'] as num).toInt();
-      proteinSum += (m['protein'] as num).toInt();
-      fatSum += (m['fat'] as num).toInt();
+      kcalSum += m.kcal;
+      carbsSum += m.carbs;
+      proteinSum += m.protein;
+      fatSum += m.fat;
     }
 
     final name = prefs.getString('name') ??
@@ -124,8 +118,7 @@ class _HomeContentState extends State<HomeContent> {
                 ),
                 child: GestureDetector(
                   onTap: () {
-                    // Navigate to Profile tab (index 4)
-                    MainShellScope.of(context)?.setIndex(4);
+                    ref.read(navigationIndexProvider.notifier).state = 4;
                   },
                   child: const Icon(Icons.person, color: Color(0xFF718096)),
                 ),
@@ -267,7 +260,7 @@ class _HomeContentState extends State<HomeContent> {
               Expanded(
                 child: GestureDetector(
                   onTap: () {
-                    MainShellScope.of(context)?.setIndex(2);
+                    ref.read(navigationIndexProvider.notifier).state = 2;
                   },
                   child: _buildQuickActionCard(
                     icon: Icons.add,
@@ -282,7 +275,7 @@ class _HomeContentState extends State<HomeContent> {
               Expanded(
                 child: GestureDetector(
                   onTap: () {
-                    MainShellScope.of(context)?.setIndex(2);
+                    ref.read(navigationIndexProvider.notifier).state = 2;
                   },
                   child: _buildQuickActionCard(
                     icon: Icons.camera_alt,
@@ -297,7 +290,7 @@ class _HomeContentState extends State<HomeContent> {
               Expanded(
                 child: GestureDetector(
                   onTap: () {
-                    MainShellScope.of(context)?.setIndex(3);
+                    ref.read(navigationIndexProvider.notifier).state = 3;
                   },
                   child: _buildQuickActionCard(
                     icon: Icons.auto_awesome,

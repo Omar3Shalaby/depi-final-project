@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:nutri_vision/Screens/main_shell.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nutri_vision/services/ai_service.dart';
+import 'package:nutri_vision/providers/app_providers.dart';
 
 /// Pure content widget — Scaffold, background & nav bar live in MainShell.
-class LogMealContent extends StatefulWidget {
+class LogMealContent extends ConsumerStatefulWidget {
   const LogMealContent({super.key});
 
   @override
-  State<LogMealContent> createState() => _LogMealContentState();
+  ConsumerState<LogMealContent> createState() => _LogMealContentState();
 }
 
-class _LogMealContentState extends State<LogMealContent> {
+class _LogMealContentState extends ConsumerState<LogMealContent> {
   bool _isAnalyzing = false;
   final TextEditingController _mealTextController = TextEditingController();
 
@@ -135,11 +136,10 @@ class _LogMealContentState extends State<LogMealContent> {
                             try {
                               final result = await AiService.analyzeMealText(text);
                               if (mounted) {
-                                final scope = MainShellScope.of(context);
-                                scope?.updateAnalyzedMeal(result);
-                                scope?.updateAlternatives([]); // Reset old recipe suggestions
-                                scope?.setIndex(5); // Navigate to Meal Details screen
-                                _mealTextController.clear(); // Clear text field
+                                ref.read(analyzedMealProvider.notifier).state = result;
+                                ref.read(alternativesProvider.notifier).state = [];
+                                ref.read(navigationIndexProvider.notifier).state = 5;
+                                _mealTextController.clear();
                               }
                             } catch (e) {
                               if (mounted) {

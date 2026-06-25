@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:math' as math;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:nutri_vision/Screens/main_shell.dart';
 import 'package:nutri_vision/services/storage_service.dart';
 import 'package:nutri_vision/services/ai_service.dart';
+import 'package:nutri_vision/models/meal_model.dart';
+import 'package:nutri_vision/providers/app_providers.dart';
 
-class MealDetailsScreen extends StatefulWidget {
+class MealDetailsScreen extends ConsumerStatefulWidget {
   const MealDetailsScreen({super.key});
 
   @override
-  State<MealDetailsScreen> createState() => _MealDetailsScreenState();
+  ConsumerState<MealDetailsScreen> createState() => _MealDetailsScreenState();
 }
 
-class _MealDetailsScreenState extends State<MealDetailsScreen> {
+class _MealDetailsScreenState extends ConsumerState<MealDetailsScreen> {
   bool _isGeneratingAlternatives = false;
+  bool _isSaving = false;
   double _goalProtein = 150.0;
   double _goalCarbs = 250.0;
   double _goalFat = 60.0;
@@ -35,8 +38,7 @@ class _MealDetailsScreenState extends State<MealDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final scope = MainShellScope.of(context);
-    final meal = scope?.currentAnalyzedMeal;
+    final meal = ref.watch(analyzedMealProvider);
 
     if (meal == null) {
       return Scaffold(
@@ -88,7 +90,7 @@ class _MealDetailsScreenState extends State<MealDetailsScreen> {
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton.icon(
-                      onPressed: () => scope?.setIndex(2),
+                      onPressed: () => ref.read(navigationIndexProvider.notifier).state = 2,
                       icon: const Icon(Icons.add),
                       label: const Text('Log A Meal'),
                       style: ElevatedButton.styleFrom(
@@ -109,12 +111,11 @@ class _MealDetailsScreenState extends State<MealDetailsScreen> {
       );
     }
 
-    final String name = meal['name'] ?? 'Analyzed Meal';
-    final int kcal = meal['kcal'] is int ? meal['kcal'] : int.tryParse(meal['kcal'].toString()) ?? 0;
-    final int protein = meal['protein'] is int ? meal['protein'] : int.tryParse(meal['protein'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-    final int carbs = meal['carbs'] is int ? meal['carbs'] : int.tryParse(meal['carbs'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-    final int fat = meal['fat'] is int ? meal['fat'] : int.tryParse(meal['fat'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-    final String description = meal['description'] ?? '';
+    final String name = meal.name;
+    final int kcal = meal.kcal;
+    final int protein = meal.protein;
+    final int carbs = meal.carbs;
+    final int fat = meal.fat;
 
     // Calculate percentages for donut chart
     final double carbsKcal = carbs * 4.0;
@@ -150,7 +151,7 @@ class _MealDetailsScreenState extends State<MealDetailsScreen> {
                       child: Row(
                         children: [
                           GestureDetector(
-                            onTap: () => scope?.setIndex(2),
+                            onTap: () => ref.read(navigationIndexProvider.notifier).state = 2,
                             child: const Icon(Icons.arrow_back, color: Color(0xFF3B694D)),
                           ),
                           const SizedBox(width: 16),
@@ -203,17 +204,6 @@ class _MealDetailsScreenState extends State<MealDetailsScreen> {
                                 color: Color(0xFF4A8B5C),
                               ),
                             ),
-                            if (description.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                description,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Color(0xFF666666),
-                                  height: 1.4,
-                                ),
-                              ),
-                            ],
                             const SizedBox(height: 24),
 
                             // Calories Banner
@@ -331,25 +321,35 @@ class _MealDetailsScreenState extends State<MealDetailsScreen> {
 
                             // Buttons
                             ElevatedButton(
-                              onPressed: () async {
-                                final now = DateTime.now();
-                                final savedMeal = {
-                                  'name': name,
-                                  'kcal': kcal,
-                                  'protein': protein,
-                                  'carbs': carbs,
-                                  'fat': fat,
-                                };
-                                await StorageService.saveMeal(now, savedMeal);
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Meal saved successfully!'),
-                                      backgroundColor: Color(0xFF4A8B5C),
-                                    ),
+                              onPressed: _isSaving
+                                  ? null
+                                  : () async {
+                                try {
+                                  setState(() => _isSaving = true);
+                                  final now = DateTime.now();
+                                  final savedMeal = Meal(
+                                    id: now.millisecondsSinceEpoch.toString(),
+                                    name: name,
+                                    time: '${now.hour}:${now.minute.toString().padLeft(2, '0')} ${now.hour >= 12 ? 'PM' : 'AM'}',
+                                    kcal: kcal,
+                                    protein: protein,
+                                    carbs: carbs,
+                                    fat: fat,
+                                    icon: 'default',
                                   );
-                                  scope?.updateAnalyzedMeal(null);
-                                  scope?.setIndex(0); // Go home
+                                  await StorageService.saveMeal(now, savedMeal);
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Meal saved successfully!'),
+                                        backgroundColor: Color(0xFF4A8B5C),
+                                      ),
+                                    );
+                                    ref.read(analyzedMealProvider.notifier).state = null;
+                                    ref.read(navigationIndexProvider.notifier).state = 0;
+                                  }
+                                } finally {
+                                  if (mounted) setState(() => _isSaving = false);
                                 }
                               },
                               style: ElevatedButton.styleFrom(
@@ -369,10 +369,20 @@ class _MealDetailsScreenState extends State<MealDetailsScreen> {
                                   : () async {
                                       setState(() => _isGeneratingAlternatives = true);
                                       try {
-                                        final recipes = await AiService.generateAlternativeRecipes(name, kcal.toString());
+                                        final recipeMaps = await AiService.generateAlternativeRecipes(name, kcal.toString());
+                                        final alternativeMeals = recipeMaps.map((r) => Meal(
+                                          id: DateTime.now().millisecondsSinceEpoch.toString(),
+                                          name: r['title'] ?? 'Alternative',
+                                          time: '12:00 PM',
+                                          kcal: int.tryParse(r['kcal'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
+                                          protein: int.tryParse(r['protein'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
+                                          carbs: int.tryParse(r['carbs'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
+                                          fat: int.tryParse(r['fat'].toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0,
+                                          icon: 'default',
+                                        )).toList();
                                         if (context.mounted) {
-                                          scope?.updateAlternatives(recipes);
-                                          scope?.setIndex(3); // Switch to AI Recipes Tab
+                                          ref.read(alternativesProvider.notifier).state = alternativeMeals;
+                                          ref.read(navigationIndexProvider.notifier).state = 3;
                                         }
                                       } catch (e) {
                                         if (context.mounted) {

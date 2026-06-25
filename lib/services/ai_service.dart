@@ -1,9 +1,21 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
+import '../models/meal_model.dart';
 
 class AiService {
   static const String _apiKey = 'sk-89fe5f3d91164486b1eebf7ae04fa140';
-  static const String _baseUrl = 'https://api.deepseek.com/chat/completions';
+  // Configured Base URL to domain root
+  static const String _baseUrl = 'https://api.deepseek.com';
+
+  static final Dio _dio = Dio(BaseOptions(baseUrl: _baseUrl))..interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            options.headers['Authorization'] = 'Bearer $_apiKey';
+            options.headers['Content-Type'] = 'application/json';
+            return handler.next(options);
+          },
+        ),
+      );
 
   // System Prompt for Meal Text Analysis
   static const String _analyzeMealSystemPrompt = '''
@@ -60,15 +72,11 @@ The JSON array must strictly match this schema:
 ''';
 
   // 1. Analyze Meal Text
-  static Future<Map<String, dynamic>> analyzeMealText(String description) async {
+  static Future<Meal> analyzeMealText(String description) async {
     try {
-      final response = await http.post(
-        Uri.parse(_baseUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_apiKey',
-        },
-        body: jsonEncode({
+      final response = await _dio.post(
+        '/chat/completions', // Set complete endpoint path
+        data: {
           'model': 'deepseek-chat',
           'messages': [
             {'role': 'system', 'content': _analyzeMealSystemPrompt},
@@ -76,34 +84,54 @@ The JSON array must strictly match this schema:
           ],
           'response_format': {'type': 'json_object'},
           'temperature': 0.2,
-        }),
+        },
       );
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
+        final Map<String, dynamic> data = response.data as Map<String, dynamic>;
         final String content = data['choices'][0]['message']['content'];
-        return jsonDecode(content);
+        final Map<String, dynamic> result = jsonDecode(content);
+        return Meal(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          name: result['name'] ?? 'Analyzed Meal',
+          time: _formatTime(DateTime.now()),
+          kcal: (result['kcal'] ?? 0) is int
+              ? result['kcal'] as int
+              : int.tryParse(result['kcal'].toString()) ?? 0,
+          protein: (result['protein'] ?? 0) is int
+              ? result['protein'] as int
+              : int.tryParse(result['protein'].toString()) ?? 0,
+          carbs: (result['carbs'] ?? 0) is int
+              ? result['carbs'] as int
+              : int.tryParse(result['carbs'].toString()) ?? 0,
+          fat: (result['fat'] ?? 0) is int
+              ? result['fat'] as int
+              : int.tryParse(result['fat'].toString()) ?? 0,
+          icon: 'default',
+        );
       } else {
-        throw Exception('Server returned status: ${response.statusCode} with body: ${response.body}');
+        throw Exception('Server returned status: ${response.statusCode} with body: ${response.data}');
       }
     } catch (e) {
       print('DeepSeek API Error (analyzeMealText): $e');
-      // Graceful fallback to local estimation in case of error
       return _generateLocalFallbackAnalysis(description);
     }
+  }
+
+  static String _formatTime(DateTime dt) {
+    final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+    final min = dt.minute.toString().padLeft(2, '0');
+    final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+    return '$hour:$min $ampm';
   }
 
   // 2. Generate Recipe Alternatives
   static Future<List<Map<String, dynamic>>> generateAlternativeRecipes(
       String originalMealName, String currentKcal) async {
     try {
-      final response = await http.post(
-        Uri.parse(_baseUrl),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_apiKey',
-        },
-        body: jsonEncode({
+      final response = await _dio.post(
+        '/chat/completions', // Set complete endpoint path
+        data: {
           'model': 'deepseek-chat',
           'messages': [
             {'role': 'system', 'content': _alternativesSystemPrompt},
@@ -112,22 +140,19 @@ The JSON array must strictly match this schema:
               'content': 'Generate healthy alternatives for: "$originalMealName" which currently has $currentKcal calories.'
             }
           ],
-          'response_format': {'type': 'json_object'}, // Note: JSON mode requires system prompt or instruction to mention JSON, which we did
+          'response_format': {'type': 'json_object'},
           'temperature': 0.5,
-        }),
+        },
       );
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
+        final Map<String, dynamic> data = response.data as Map<String, dynamic>;
         final String content = data['choices'][0]['message']['content'];
         
-        // DeepSeek returns a JSON object, so if we forced json_object format, it might wrap the array in a key.
-        // Let's handle both a raw array and a wrapped array (e.g. {"recipes": [...]}).
         final parsed = jsonDecode(content);
         if (parsed is List) {
           return parsed.map((item) => Map<String, dynamic>.from(item)).toList();
         } else if (parsed is Map) {
-          // Find any list property
           for (var value in parsed.values) {
             if (value is List) {
               return value.map((item) => Map<String, dynamic>.from(item)).toList();
@@ -140,13 +165,12 @@ The JSON array must strictly match this schema:
       }
     } catch (e) {
       print('DeepSeek API Error (generateAlternativeRecipes): $e');
-      // Graceful fallback
       return _generateLocalFallbackRecipes(originalMealName, currentKcal);
     }
   }
 
-  // Local rule-based fallback generator for analyzeMealText in case of API failure / offline mode
-  static Map<String, dynamic> _generateLocalFallbackAnalysis(String text) {
+  // Local fallback generator for analyzeMealText
+  static Meal _generateLocalFallbackAnalysis(String text) {
     final String cleanText = text.toLowerCase();
     int kcal = 500;
     int protein = 25;
@@ -172,29 +196,27 @@ The JSON array must strictly match this schema:
     }
 
     if (text.length > 3) {
-      // capitalize first letters
       name = text[0].toUpperCase() + text.substring(1);
       if (name.length > 35) {
         name = '${name.substring(0, 32)}...';
       }
     }
 
-    return {
-      'name': name,
-      'kcal': kcal,
-      'protein': protein,
-      'carbs': carbs,
-      'fat': fat,
-      'description': 'AI Analysis Offline Fallback: Estimated values for "$text".'
-    };
+    return Meal(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      name: name,
+      time: _formatTime(DateTime.now()),
+      kcal: kcal,
+      protein: protein,
+      carbs: carbs,
+      fat: fat,
+      icon: 'default',
+    );
   }
 
   // Local fallback generator for recipe alternatives
   static List<Map<String, dynamic>> _generateLocalFallbackRecipes(
       String originalName, String kcalStr) {
-    final cleanName = originalName.toLowerCase();
-    
-    // Default fallback recipes
     return [
       {
         'title': 'Lemon Herb Chicken with Quinoa & Steamed Vegetables',
