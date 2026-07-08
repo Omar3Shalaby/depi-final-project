@@ -4,6 +4,7 @@ import '../models/meal_model.dart';
 import 'ai_recipe_detailed.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/meal_provider.dart';
+import '../providers/app_providers.dart';
 
 class AiRecipeAlternativeContent extends ConsumerStatefulWidget {
   const AiRecipeAlternativeContent({super.key});
@@ -157,9 +158,20 @@ class _AiRecipeAlternativeContentState extends ConsumerState<AiRecipeAlternative
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Expanded(
+            child: Image.network(
+              recipe.image,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                color: _lightBgGrey,
+                child: const Icon(Icons.restaurant, color: Colors.grey, size: 50),
+              ),
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -171,7 +183,7 @@ class _AiRecipeAlternativeContentState extends ConsumerState<AiRecipeAlternative
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     _buildPillMacro(recipe.kcal, Icons.local_fire_department, const Color(0xFFF2A65A)),
@@ -179,7 +191,7 @@ class _AiRecipeAlternativeContentState extends ConsumerState<AiRecipeAlternative
                     _buildPillMacro(recipe.protein, Icons.thumb_up, const Color(0xFF5A92D6)),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(

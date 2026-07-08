@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/meal_model.dart';
 import '../providers/meal_provider.dart';
 import '../services/storage_service.dart';
+import '../services/notification_service.dart';
 
 class AiRecipeDetailsScreen extends StatefulWidget {
   final Recipe recipe;
@@ -50,22 +51,70 @@ class _AiRecipeDetailsScreenState extends State<AiRecipeDetailsScreen> {
 
     try {
       await StorageService.saveMeal(now, newMeal);
+      // Trigger notification about the meal
+      NotificationService.showMealAnalysisNotification(newMeal.name, newMeal.kcal).catchError((_) {});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: _primaryGreen,
-            content: Text('"${widget.recipe.title}" added to your meal history!'),
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '✓ "${widget.recipe.title}" successfully logged in your meals history!',
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+            duration: const Duration(seconds: 3),
           ),
         );
         Navigator.pop(context);
       }
+    } on DuplicateMealException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Color(0xFFF2A65A),
+            content: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.white, size: 20),
+                SizedBox(width: 10),
+                Expanded(child: Text('This meal has already been logged today.')),
+              ],
+            ),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    } on MealLimitExceededException {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Colors.redAccent,
+            content: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
+                SizedBox(width: 10),
+                Expanded(child: Text('Daily limit of 5 meals reached. Delete a meal to add more.')),
+              ],
+            ),
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          backgroundColor: Colors.redAccent,
-          content: Text('Failed to log meal. Please try again.'),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Colors.redAccent,
+            content: Text('Failed to log meal. Please try again.'),
+          ),
+        );
+      }
     }
   }
 

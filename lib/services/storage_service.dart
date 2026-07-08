@@ -4,6 +4,20 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/meal_model.dart';
 
+class MealLimitExceededException implements Exception {
+  final String message;
+  MealLimitExceededException([this.message = 'Daily meal limit of 5 reached.']);
+  @override
+  String toString() => message;
+}
+
+class DuplicateMealException implements Exception {
+  final String message;
+  DuplicateMealException([this.message = 'This meal has already been logged today.']);
+  @override
+  String toString() => message;
+}
+
 class StorageService {
   static const String _mealsKeyPrefix = 'logged_meals_';
 
@@ -118,8 +132,22 @@ class StorageService {
     );
     final existingIndex = meals.indexWhere((m) => m.id == meal.id);
     if (existingIndex >= 0) {
+      // Updating an existing meal — always allowed
       meals[existingIndex] = updatedMeal;
     } else {
+      // Check for duplicate meal name (case-insensitive) on the same day
+      final isDuplicate = meals.any(
+        (m) => m.name.toLowerCase().trim() == meal.name.toLowerCase().trim(),
+      );
+      if (isDuplicate) {
+        throw DuplicateMealException();
+      }
+
+      // Check daily limit (max 5 meals per day)
+      if (meals.length >= 5) {
+        throw MealLimitExceededException();
+      }
+
       meals.add(updatedMeal);
     }
     await _saveList(date, meals);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nutri_vision/services/ai_service.dart';
 import 'package:nutri_vision/providers/app_providers.dart';
+import 'package:nutri_vision/providers/meal_provider.dart';
 
 /// Pure content widget — Scaffold, background & nav bar live in MainShell.
 class LogMealContent extends ConsumerStatefulWidget {
@@ -137,7 +138,7 @@ class _LogMealContentState extends ConsumerState<LogMealContent> {
                               final result = await AiService.analyzeMealText(text);
                               if (mounted) {
                                 ref.read(analyzedMealProvider.notifier).state = result;
-                                ref.read(alternativesProvider.notifier).state = [];
+                                ref.read(alternativesProvider.notifier).clear();
                                 ref.read(navigationIndexProvider.notifier).state = 5;
                                 _mealTextController.clear();
                               }

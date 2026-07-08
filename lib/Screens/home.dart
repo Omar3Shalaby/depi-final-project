@@ -275,21 +275,6 @@ class _HomeContentState extends ConsumerState<HomeContent> {
               Expanded(
                 child: GestureDetector(
                   onTap: () {
-                    ref.read(navigationIndexProvider.notifier).state = 2;
-                  },
-                  child: _buildQuickActionCard(
-                    icon: Icons.camera_alt,
-                    iconColor: Colors.white,
-                    iconBgColor: const Color(0xFF8B9CB6),
-                    title: 'Analyze Food',
-                    subtitle: 'Get nutritional info',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () {
                     ref.read(navigationIndexProvider.notifier).state = 3;
                   },
                   child: _buildQuickActionCard(

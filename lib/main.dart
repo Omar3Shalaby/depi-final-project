@@ -8,9 +8,7 @@ import 'Screens/main_shell.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const ProviderScope(child: MyApp()));
 }
 
@@ -30,9 +28,7 @@ class MyApp extends StatelessWidget {
       home: FirebaseAuth.instance.currentUser != null
           ? const MainShell()
           : const LoginScreen(),
-      routes: {
-        '/home': (context) => const MainShell(),
-      },
+      routes: {'/home': (context) => const MainShell()},
     );
   }
 }

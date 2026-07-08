@@ -25,6 +25,16 @@ class _ProfileContentState extends State<ProfileContent> {
     super.initState();
     _loadName();
     _loadGoals();
+    _loadNotificationStatus();
+  }
+
+  Future<void> _loadNotificationStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
+      });
+    }
   }
 
   Future<void> _loadName() async {
@@ -369,8 +379,15 @@ class _ProfileContentState extends State<ProfileContent> {
                     activeColor: Colors.white,
                     activeTrackColor: const Color(0xFF4A8B5C),
                     inactiveTrackColor: Colors.grey.shade300,
-                    onChanged: (val) =>
-                        setState(() => _notificationsEnabled = val),
+                    onChanged: (val) async {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setBool('notifications_enabled', val);
+                      if (mounted) {
+                        setState(() {
+                          _notificationsEnabled = val;
+                        });
+                      }
+                    },
                   ),
                   onTap: null,
                 ),

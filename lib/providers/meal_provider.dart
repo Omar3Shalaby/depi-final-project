@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/meal_model.dart';
 import '../services/storage_service.dart';
 import '../services/ai_service.dart';
+import 'app_providers.dart';
 
 // Rich model representing an AI-generated Recipe alternative
 class Recipe {
@@ -51,9 +52,6 @@ class Recipe {
   }
 }
 
-final analyzedMealProvider = StateProvider<Meal?>((ref) => null);
-final aiLoadingProvider = StateProvider<bool>((ref) => false);
-
 // Returns a typed List of Recipe alternatives
 final alternativesProvider = StateNotifierProvider<AlternativesNotifier, List<Recipe>>((ref) {
   return AlternativesNotifier(ref);
@@ -79,6 +77,10 @@ class AlternativesNotifier extends StateNotifier<List<Recipe>> {
     } finally {
       _ref.read(aiLoadingProvider.notifier).state = false;
     }
+  }
+
+  void clear() {
+    state = [];
   }
 }
 
