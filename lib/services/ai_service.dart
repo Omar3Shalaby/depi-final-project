@@ -2,56 +2,76 @@ import 'package:dio/dio.dart';
 import '../models/meal_model.dart';
 
 class AiService {
-  static const String _apiKey = 'SResl82Zhh1LE8fVAD8Z8s6VBg1pQaQIt7a12B4C';
-  static const String _baseUrl = 'https://api.api-ninjas.com/v1';
+  // ── Recipe search (API Ninjas) ───────────────────────────────────────
+  // Only used for recipe titles/ingredients/instructions text — NOT for
+  // nutrition numbers, so the "premium field" restriction below doesn't
+  // affect this part.
+  static const String _recipeApiKey = 'SResl82Zhh1LE8fVAD8Z8s6VBg1pQaQIt7a12B4C';
+  static const String _recipeBaseUrl = 'https://api.api-ninjas.com/v1';
 
-  static final Dio _dio = Dio(BaseOptions(baseUrl: _baseUrl))..interceptors.add(
+  static final Dio _recipeDio = Dio(BaseOptions(baseUrl: _recipeBaseUrl))..interceptors.add(
         InterceptorsWrapper(
           onRequest: (options, handler) {
-            options.headers['X-Api-Key'] = _apiKey;
+            options.headers['X-Api-Key'] = _recipeApiKey;
             options.headers['Content-Type'] = 'application/json';
             return handler.next(options);
           },
         ),
       );
 
+  // ── Nutrition data (USDA FoodData Central) ───────────────────────────
+  // We switched away from API Ninjas' /nutrition endpoint for macro data:
+  // its `calories` and `protein_g` fields are locked behind a paid
+  // "premium" plan and return null/0 on a free key — that was the source
+  // of the "0 kcal / 0g protein" results. FoodData Central is a free,
+  // government-run (USDA) nutrition database that includes calories and
+  // protein at no cost.
+  //
+  // IMPORTANT: 'DEMO_KEY' below is a shared public test key rate-limited
+  // to ~30 requests/hour per IP. Get your own free key in under a minute
+  // (no credit card, instant) at https://fdc.nal.usda.gov/api-key-signup
+  // and replace DEMO_KEY with it before shipping.
+  static const String _usdaApiKey = 'DEMO_KEY';
+  static const String _usdaBaseUrl = 'https://api.nal.usda.gov/fdc/v1';
+  static final Dio _usdaDio = Dio(BaseOptions(baseUrl: _usdaBaseUrl));
+
   static Future<Meal> analyzeMealText(String description) async {
-    try {
-      final response = await _dio.get('/nutrition', queryParameters: {'query': description});
-
-      if (response.statusCode == 200) {
-        final data = response.data;
-        if (data is List && data.isNotEmpty) {
-          return parseNutritionResponse(data, description);
-        }
-        throw Exception('Nutrition API returned no food items.');
-      }
-
-      throw Exception('Server returned status: ${response.statusCode} with body: ${response.data}');
-    } catch (e) {
-      print('API Ninjas nutrition error (analyzeMealText): $e');
+    final items = _splitFoodItems(description);
+    if (items.isEmpty) {
       return _generateLocalFallbackAnalysis(description);
     }
-  }
 
-  static Meal parseNutritionResponse(List<dynamic> rawItems, String description) {
-    final firstItem = rawItems.isNotEmpty ? rawItems.first : null;
-    final item = firstItem is Map ? Map<String, dynamic>.from(firstItem) : null;
+    double kcal = 0, protein = 0, carbs = 0, fat = 0;
+    final matchedNames = <String>[];
+    var anySucceeded = false;
 
-    final name = item?['name']?.toString() ?? description;
-    final kcal = _parseNumericValue(item?['calories'], description, 150);
-    final protein = _parseNumericValue(item?['protein_g'], description, 8);
-    final carbs = _parseNumericValue(item?['carbohydrates_total_g'] ?? item?['carbohydrates'], description, 20);
-    final fat = _parseNumericValue(item?['fat_total_g'] ?? item?['fat'], description, 5);
+    for (final rawItem in items) {
+      final parsed = _extractGramWeight(rawItem);
+      final per100g = await _usdaLookup(parsed.query);
+      if (per100g == null) continue;
+
+      anySucceeded = true;
+      matchedNames.add(parsed.query);
+      final scale = (parsed.grams ?? 100) / 100;
+      kcal += per100g['kcal']! * scale;
+      protein += per100g['protein']! * scale;
+      carbs += per100g['carbs']! * scale;
+      fat += per100g['fat']! * scale;
+    }
+
+    if (!anySucceeded) {
+      print('USDA lookup found no matches for "$description", using local fallback.');
+      return _generateLocalFallbackAnalysis(description);
+    }
 
     return Meal(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      name: _toTitleCase(name),
+      name: _toTitleCase(matchedNames.join(', ')),
       time: _formatTime(DateTime.now()),
-      kcal: kcal,
-      protein: protein,
-      carbs: carbs,
-      fat: fat,
+      kcal: kcal.round(),
+      protein: protein.round(),
+      carbs: carbs.round(),
+      fat: fat.round(),
       icon: 'default',
     );
   }
@@ -59,12 +79,12 @@ class AiService {
   static Future<List<Map<String, dynamic>>> generateAlternativeRecipes(
       String originalMealName, String currentKcal) async {
     try {
-      final response = await _dio.get('/recipe', queryParameters: {'query': originalMealName});
+      final response = await _recipeDio.get('/recipe', queryParameters: {'query': originalMealName});
 
       if (response.statusCode == 200) {
         final data = response.data;
         if (data is List && data.isNotEmpty) {
-          return parseRecipeResponse(data, originalMealName, currentKcal);
+          return await _parseRecipeResponse(data, originalMealName, currentKcal);
         }
         throw Exception('Recipe API returned no items.');
       }
@@ -76,8 +96,12 @@ class AiService {
     }
   }
 
-  static List<Map<String, dynamic>> parseRecipeResponse(
-      List<dynamic> rawItems, String originalMealName, String currentKcal) {
+  // The /recipe endpoint only returns title/ingredients/instructions — no
+  // nutrition data — so we look up real nutrition for the recipe's actual
+  // ingredients via USDA FoodData Central and sum it, rather than
+  // inventing numbers.
+  static Future<List<Map<String, dynamic>>> _parseRecipeResponse(
+      List<dynamic> rawItems, String originalMealName, String currentKcal) async {
     final baseKcal = int.tryParse(currentKcal.replaceAll(RegExp(r'[^0-9]'), '')) ?? 500;
     final recipes = <Map<String, dynamic>>[];
 
@@ -89,15 +113,18 @@ class AiService {
 
       final map = Map<String, dynamic>.from(item);
       final title = map['title']?.toString() ?? 'Healthy Recipe';
-      final kcal = _deriveKcal(baseKcal, index, title);
-      final protein = _deriveMacro(baseKcal, index, 'protein');
-      final carbs = _deriveMacro(baseKcal, index, 'carbs');
-      final fat = _deriveMacro(baseKcal, index, 'fat');
+      final ingredients = _toStringList(map['ingredients']);
+
+      final macros = await _lookupNutritionForIngredients(ingredients, baseKcal);
+      final kcal = macros['kcal']!;
+      final protein = macros['protein']!;
+      final carbs = macros['carbs']!;
+      final fat = macros['fat']!;
 
       recipes.add({
         'title': title,
         'image': _selectImageForRecipe(title),
-        'savings': '-${(baseKcal - kcal).toString()} kcal',
+        'savings': '${(baseKcal - kcal) >= 0 ? '-' : '+'}${(baseKcal - kcal).abs()} kcal',
         'kcal': '$kcal kcal',
         'protein': '${protein}g',
         'carbs': '${carbs}g',
@@ -105,7 +132,7 @@ class AiService {
         'desc': 'A lighter and more balanced version of $title designed for better nutrition.',
         'prepTime': map['prep_time']?.toString() ?? map['prepTime']?.toString() ?? '${8 + index * 2} min',
         'cookTime': map['cook_time']?.toString() ?? map['cookTime']?.toString() ?? '${10 + index * 3} min',
-        'ingredients': _toStringList(map['ingredients']),
+        'ingredients': ingredients,
         'instructions': _toStringList(map['instructions']),
       });
     }
@@ -117,41 +144,148 @@ class AiService {
     return recipes;
   }
 
+  /// Looks up real nutrition totals for a list of ingredient strings via
+  /// USDA FoodData Central. Falls back to a neutral, clearly-approximate
+  /// estimate only if no ingredient could be matched at all.
+  static Future<Map<String, int>> _lookupNutritionForIngredients(
+      List<String> ingredients, int baseKcal) async {
+    if (ingredients.isEmpty) {
+      return _estimatedMacros(baseKcal);
+    }
+
+    double kcal = 0, protein = 0, carbs = 0, fat = 0;
+    var anySucceeded = false;
+
+    for (final ingredient in ingredients) {
+      final parsed = _extractGramWeight(ingredient);
+      final per100g = await _usdaLookup(parsed.query);
+      if (per100g == null) continue;
+
+      anySucceeded = true;
+      final scale = (parsed.grams ?? 100) / 100;
+      kcal += per100g['kcal']! * scale;
+      protein += per100g['protein']! * scale;
+      carbs += per100g['carbs']! * scale;
+      fat += per100g['fat']! * scale;
+    }
+
+    if (!anySucceeded || kcal <= 0) {
+      return _estimatedMacros(baseKcal);
+    }
+
+    return {
+      'kcal': kcal.round(),
+      'protein': protein.round(),
+      'carbs': carbs.round(),
+      'fat': fat.round(),
+    };
+  }
+
+  static Map<String, int> _estimatedMacros(int baseKcal) {
+    return {
+      'kcal': (baseKcal * 0.8).round(),
+      'protein': (baseKcal * 0.08).round(),
+      'carbs': (baseKcal * 0.08).round(),
+      'fat': (baseKcal * 0.03).round(),
+    };
+  }
+
+  // ── USDA FoodData Central helpers ────────────────────────────────────
+
+  /// Splits a free-text meal description into individual food phrases,
+  /// e.g. "grilled chicken with rice and salad" -> ["grilled chicken", "rice", "salad"].
+  static List<String> _splitFoodItems(String description) {
+    final normalized = description
+        .replaceAll(RegExp(r'\bwith\b', caseSensitive: false), ',')
+        .replaceAll(RegExp(r'\band\b', caseSensitive: false), ',')
+        .replaceAll('+', ',')
+        .replaceAll('&', ',');
+    return normalized
+        .split(',')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+  }
+
+  /// Pulls an explicit gram quantity out of a phrase (e.g. "150g chicken
+  /// breast" -> query "chicken breast", grams 150). If no gram quantity is
+  /// present, the full phrase is used as the search query and nutrition is
+  /// reported per the USDA database's standard 100g serving.
+  static ({String query, double? grams}) _extractGramWeight(String phrase) {
+    final match = RegExp(r'(\d+(\.\d+)?)\s*g\b', caseSensitive: false).firstMatch(phrase);
+    if (match != null) {
+      final grams = double.tryParse(match.group(1)!);
+      final cleaned = phrase.replaceRange(match.start, match.end, '').trim();
+      return (query: cleaned.isEmpty ? phrase : cleaned, grams: grams);
+    }
+    return (query: phrase, grams: null);
+  }
+
+  /// Queries USDA FoodData Central for a food name and returns its
+  /// calories/protein/carbs/fat per 100g, or null if nothing matched.
+  static Future<Map<String, double>?> _usdaLookup(String foodQuery) async {
+    final query = foodQuery.trim();
+    if (query.isEmpty) return null;
+
+    try {
+      final response = await _usdaDio.get('/foods/search', queryParameters: {
+        'query': query,
+        'pageSize': 5,
+        'api_key': _usdaApiKey,
+      });
+
+      if (response.statusCode != 200) return null;
+      final foods = response.data is Map ? response.data['foods'] : null;
+      if (foods is! List || foods.isEmpty) return null;
+
+      // Prefer whole-food reference data over branded/processed products
+      // for more representative values.
+      const preferredOrder = ['Foundation', 'SR Legacy', 'Survey (FNDDS)', 'Branded'];
+      Map<String, dynamic>? best;
+      for (final type in preferredOrder) {
+        final match = foods.firstWhere(
+          (f) => f is Map && f['dataType'] == type,
+          orElse: () => null,
+        );
+        if (match != null) {
+          best = Map<String, dynamic>.from(match as Map);
+          break;
+        }
+      }
+      best ??= Map<String, dynamic>.from(foods.first as Map);
+
+      final nutrients = best['foodNutrients'];
+      if (nutrients is! List) return null;
+
+      double? findNutrient(String targetName) {
+        for (final n in nutrients) {
+          if (n is! Map) continue;
+          final nutrientName = n['nutrientName']?.toString() ?? '';
+          if (nutrientName.toLowerCase() == targetName.toLowerCase()) {
+            final value = n['value'];
+            if (value is num) return value.toDouble();
+          }
+        }
+        return null;
+      }
+
+      return {
+        'kcal': findNutrient('Energy') ?? 0,
+        'protein': findNutrient('Protein') ?? 0,
+        'fat': findNutrient('Total lipid (fat)') ?? 0,
+        'carbs': findNutrient('Carbohydrate, by difference') ?? 0,
+      };
+    } catch (e) {
+      print('USDA FoodData Central error ("$query"): $e');
+      return null;
+    }
+  }
+
   static String _formatTime(DateTime dt) {
     final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
     final min = dt.minute.toString().padLeft(2, '0');
     final ampm = dt.hour >= 12 ? 'PM' : 'AM';
     return '$hour:$min $ampm';
-  }
-
-  static int _parseNumericValue(dynamic value, String description, int fallback) {
-    if (value is num) {
-      return value.round();
-    }
-    if (value is String) {
-      final parsed = double.tryParse(value.replaceAll(RegExp(r'[^0-9.-]'), ''));
-      if (parsed != null) {
-        return parsed.round();
-      }
-    }
-
-    final cleanedDescription = description.toLowerCase();
-    if (cleanedDescription.contains('chicken')) {
-      return fallback + 40;
-    }
-    if (cleanedDescription.contains('salad') || cleanedDescription.contains('vegetable')) {
-      return fallback + 20;
-    }
-    if (cleanedDescription.contains('egg') || cleanedDescription.contains('omelet')) {
-      return fallback + 30;
-    }
-    if (cleanedDescription.contains('fish') || cleanedDescription.contains('salmon') || cleanedDescription.contains('tuna')) {
-      return fallback + 35;
-    }
-    if (cleanedDescription.contains('rice') || cleanedDescription.contains('pasta') || cleanedDescription.contains('bread')) {
-      return fallback + 60;
-    }
-    return fallback;
   }
 
   static String _toTitleCase(String value) {
@@ -164,33 +298,6 @@ class AiService {
         .split(' ')
         .map((part) => part.isEmpty ? part : part[0].toUpperCase() + part.substring(1).toLowerCase())
         .join(' ');
-  }
-
-  static int _deriveKcal(int baseKcal, int index, String title) {
-    final reduction = 60 + (index * 25);
-    final derived = baseKcal - reduction;
-
-    if (title.toLowerCase().contains('salad')) {
-      return derived < 250 ? 250 : derived;
-    }
-    if (title.toLowerCase().contains('soup')) {
-      return derived < 280 ? 280 : derived;
-    }
-    return derived < 300 ? 300 : derived;
-  }
-
-  static int _deriveMacro(int baseKcal, int index, String type) {
-    final base = (baseKcal * 0.08).round();
-    switch (type) {
-      case 'protein':
-        return base + index * 3 + 20;
-      case 'carbs':
-        return base + index * 2 + 12;
-      case 'fat':
-        return base + index + 6;
-      default:
-        return 0;
-    }
   }
 
   static String _selectImageForRecipe(String title) {
