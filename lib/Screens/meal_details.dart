@@ -18,7 +18,6 @@ class MealDetailsScreen extends ConsumerStatefulWidget {
 class _MealDetailsScreenState extends ConsumerState<MealDetailsScreen> {
   bool _isGeneratingAlternatives = false;
   bool _isSaving = false;
-  bool _listenerRegistered = false;
   double _goalProtein = 150.0;
   double _goalCarbs = 250.0;
   double _goalFat = 60.0;
@@ -41,21 +40,18 @@ class _MealDetailsScreenState extends ConsumerState<MealDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Ensure we register the provider listener from within build
-    // (ref.listen must be called during build for ConsumerWidgets).
-    if (!_listenerRegistered) {
-      _listenerRegistered = true;
-      ref.listen<Meal?>(analyzedMealProvider, (previous, next) {
-        if (previous?.id != next?.id) {
-          if (mounted) {
-            setState(() {
-              _isSaving = false;
-              _isGeneratingAlternatives = false;
-            });
-          }
+    // Register listener on every build - this is important when widget is reused
+    // in IndexedStack and brought back into view
+    ref.listen<Meal?>(analyzedMealProvider, (previous, next) {
+      if (previous?.id != next?.id) {
+        if (mounted) {
+          setState(() {
+            _isSaving = false;
+            _isGeneratingAlternatives = false;
+          });
         }
-      });
-    }
+      }
+    });
 
     final meal = ref.watch(analyzedMealProvider);
 
