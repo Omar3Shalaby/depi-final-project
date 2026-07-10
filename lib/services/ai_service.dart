@@ -1,121 +1,120 @@
-import 'dart:convert';
 import 'package:dio/dio.dart';
 import '../models/meal_model.dart';
 
 class AiService {
-  static const String _apiKey = 'sk-89fe5f3d91164486b1eebf7ae04fa140';
-  // Configured Base URL to domain root
-  static const String _baseUrl = 'https://api.deepseek.com';
+  static const String _apiKey = 'SResl82Zhh1LE8fVAD8Z8s6VBg1pQaQIt7a12B4C';
+  static const String _baseUrl = 'https://api.api-ninjas.com/v1';
 
   static final Dio _dio = Dio(BaseOptions(baseUrl: _baseUrl))..interceptors.add(
         InterceptorsWrapper(
           onRequest: (options, handler) {
-            options.headers['Authorization'] = 'Bearer $_apiKey';
+            options.headers['X-Api-Key'] = _apiKey;
             options.headers['Content-Type'] = 'application/json';
             return handler.next(options);
           },
         ),
       );
 
-  // System Prompt for Meal Text Analysis
-  static const String _analyzeMealSystemPrompt = '''
-You are an expert nutritionist AI. Your task is to analyze the user's description of a meal and estimate its nutritional breakdown.
-You must respond with ONLY a JSON object. Do not include markdown code blocks or any text outside of the JSON object.
-The JSON object must strictly match the following schema:
-{
-  "name": "A clean, concise name for the meal (e.g. Grilled Chicken & Brown Rice)",
-  "kcal": 620, // Integer: estimated total calories in kcal
-  "protein": 42, // Integer: estimated protein in grams
-  "carbs": 55, // Integer: estimated carbohydrates in grams
-  "fat": 18, // Integer: estimated fat in grams
-  "description": "A brief 1-2 sentence nutritional summary of the meal."
-}
-''';
-
-  // System Prompt for Recipe Alternatives
-  static const String _alternativesSystemPrompt = '''
-You are an expert chef and dietitian AI.
-Given an original meal name and its current calorie count, generate 3-4 healthy alternative recipes that are lower in calories and higher in nutrition.
-For each alternative recipe, select a relevant, high-quality food image from Unsplash, or select one of these general Unsplash URLs:
-- Healthy Salad: https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&q=80&w=600
-- Grilled Salmon: https://images.unsplash.com/photo-1485962398705-ef6a13c41e8f?auto=format&fit=crop&q=80&w=600
-- Chicken Quinoa Bowl: https://images.unsplash.com/photo-1467003909585-2f8a72700288?auto=format&fit=crop&q=80&w=600
-- Tofu Stir Fry: https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=600
-- Avocado Egg Toast: https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&q=80&w=600
-
-You must respond with ONLY a JSON array containing recipe objects. Do not include markdown code blocks or any text outside of the JSON.
-The JSON array must strictly match this schema:
-[
-  {
-    "title": "Recipe Title",
-    "image": "selected_unsplash_image_url",
-    "savings": "-130 kcal", // String: difference in calories (e.g., "-130 kcal")
-    "kcal": "490 kcal", // String: new calorie count (e.g., "490 kcal")
-    "protein": "38g", // String: grams of protein (e.g., "38g")
-    "carbs": "42g", // String: grams of carbs (e.g., "42g")
-    "fat": "12g", // String: grams of fat (e.g., "12g")
-    "desc": "A brief description of this healthier swap.",
-    "prepTime": "10 min",
-    "cookTime": "20 min",
-    "ingredients": [
-      "Ingredient 1 with quantity",
-      "Ingredient 2 with quantity",
-      "..."
-    ],
-    "instructions": [
-      "Step 1 of instructions.",
-      "Step 2 of instructions.",
-      "..."
-    ]
-  }
-]
-''';
-
-  // 1. Analyze Meal Text
   static Future<Meal> analyzeMealText(String description) async {
     try {
-      final response = await _dio.post(
-        '/chat/completions', // Set complete endpoint path
-        data: {
-          'model': 'deepseek-chat',
-          'messages': [
-            {'role': 'system', 'content': _analyzeMealSystemPrompt},
-            {'role': 'user', 'content': 'Analyze this meal: "$description"'}
-          ],
-          'response_format': {'type': 'json_object'},
-          'temperature': 0.2,
-        },
-      );
+      final response = await _dio.get('/nutrition', queryParameters: {'query': description});
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> data = response.data as Map<String, dynamic>;
-        final String content = data['choices'][0]['message']['content'];
-        final Map<String, dynamic> result = jsonDecode(content);
-        return Meal(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          name: result['name'] ?? 'Analyzed Meal',
-          time: _formatTime(DateTime.now()),
-          kcal: (result['kcal'] ?? 0) is int
-              ? result['kcal'] as int
-              : int.tryParse(result['kcal'].toString()) ?? 0,
-          protein: (result['protein'] ?? 0) is int
-              ? result['protein'] as int
-              : int.tryParse(result['protein'].toString()) ?? 0,
-          carbs: (result['carbs'] ?? 0) is int
-              ? result['carbs'] as int
-              : int.tryParse(result['carbs'].toString()) ?? 0,
-          fat: (result['fat'] ?? 0) is int
-              ? result['fat'] as int
-              : int.tryParse(result['fat'].toString()) ?? 0,
-          icon: 'default',
-        );
-      } else {
-        throw Exception('Server returned status: ${response.statusCode} with body: ${response.data}');
+        final data = response.data;
+        if (data is List && data.isNotEmpty) {
+          return parseNutritionResponse(data, description);
+        }
+        throw Exception('Nutrition API returned no food items.');
       }
+
+      throw Exception('Server returned status: ${response.statusCode} with body: ${response.data}');
     } catch (e) {
-      print('DeepSeek API Error (analyzeMealText): $e');
+      print('API Ninjas nutrition error (analyzeMealText): $e');
       return _generateLocalFallbackAnalysis(description);
     }
+  }
+
+  static Meal parseNutritionResponse(List<dynamic> rawItems, String description) {
+    final firstItem = rawItems.isNotEmpty ? rawItems.first : null;
+    final item = firstItem is Map ? Map<String, dynamic>.from(firstItem) : null;
+
+    final name = item?['name']?.toString() ?? description;
+    final kcal = _parseNumericValue(item?['calories'], description, 150);
+    final protein = _parseNumericValue(item?['protein_g'], description, 8);
+    final carbs = _parseNumericValue(item?['carbohydrates_total_g'] ?? item?['carbohydrates'], description, 20);
+    final fat = _parseNumericValue(item?['fat_total_g'] ?? item?['fat'], description, 5);
+
+    return Meal(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      name: _toTitleCase(name),
+      time: _formatTime(DateTime.now()),
+      kcal: kcal,
+      protein: protein,
+      carbs: carbs,
+      fat: fat,
+      icon: 'default',
+    );
+  }
+
+  static Future<List<Map<String, dynamic>>> generateAlternativeRecipes(
+      String originalMealName, String currentKcal) async {
+    try {
+      final response = await _dio.get('/recipe', queryParameters: {'query': originalMealName});
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+        if (data is List && data.isNotEmpty) {
+          return parseRecipeResponse(data, originalMealName, currentKcal);
+        }
+        throw Exception('Recipe API returned no items.');
+      }
+
+      throw Exception('Server returned status: ${response.statusCode}');
+    } catch (e) {
+      print('API Ninjas recipe error (generateAlternativeRecipes): $e');
+      return _generateLocalFallbackRecipes(originalMealName, currentKcal);
+    }
+  }
+
+  static List<Map<String, dynamic>> parseRecipeResponse(
+      List<dynamic> rawItems, String originalMealName, String currentKcal) {
+    final baseKcal = int.tryParse(currentKcal.replaceAll(RegExp(r'[^0-9]'), '')) ?? 500;
+    final recipes = <Map<String, dynamic>>[];
+
+    for (var index = 0; index < rawItems.length && recipes.length < 3; index++) {
+      final item = rawItems[index];
+      if (item is! Map) {
+        continue;
+      }
+
+      final map = Map<String, dynamic>.from(item);
+      final title = map['title']?.toString() ?? 'Healthy Recipe';
+      final kcal = _deriveKcal(baseKcal, index, title);
+      final protein = _deriveMacro(baseKcal, index, 'protein');
+      final carbs = _deriveMacro(baseKcal, index, 'carbs');
+      final fat = _deriveMacro(baseKcal, index, 'fat');
+
+      recipes.add({
+        'title': title,
+        'image': _selectImageForRecipe(title),
+        'savings': '-${(baseKcal - kcal).toString()} kcal',
+        'kcal': '$kcal kcal',
+        'protein': '${protein}g',
+        'carbs': '${carbs}g',
+        'fat': '${fat}g',
+        'desc': 'A lighter and more balanced version of $title designed for better nutrition.',
+        'prepTime': map['prep_time']?.toString() ?? map['prepTime']?.toString() ?? '${8 + index * 2} min',
+        'cookTime': map['cook_time']?.toString() ?? map['cookTime']?.toString() ?? '${10 + index * 3} min',
+        'ingredients': _toStringList(map['ingredients']),
+        'instructions': _toStringList(map['instructions']),
+      });
+    }
+
+    if (recipes.isEmpty) {
+      return _generateLocalFallbackRecipes(originalMealName, currentKcal);
+    }
+
+    return recipes;
   }
 
   static String _formatTime(DateTime dt) {
@@ -125,51 +124,99 @@ The JSON array must strictly match this schema:
     return '$hour:$min $ampm';
   }
 
-  // 2. Generate Recipe Alternatives
-  static Future<List<Map<String, dynamic>>> generateAlternativeRecipes(
-      String originalMealName, String currentKcal) async {
-    try {
-      final response = await _dio.post(
-        '/chat/completions', // Set complete endpoint path
-        data: {
-          'model': 'deepseek-chat',
-          'messages': [
-            {'role': 'system', 'content': _alternativesSystemPrompt},
-            {
-              'role': 'user',
-              'content': 'Generate healthy alternatives for: "$originalMealName" which currently has $currentKcal calories.'
-            }
-          ],
-          'response_format': {'type': 'json_object'},
-          'temperature': 0.5,
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = response.data as Map<String, dynamic>;
-        final String content = data['choices'][0]['message']['content'];
-        
-        final parsed = jsonDecode(content);
-        if (parsed is List) {
-          return parsed.map((item) => Map<String, dynamic>.from(item)).toList();
-        } else if (parsed is Map) {
-          for (var value in parsed.values) {
-            if (value is List) {
-              return value.map((item) => Map<String, dynamic>.from(item)).toList();
-            }
-          }
-        }
-        throw Exception('Failed to parse alternatives JSON from response: $content');
-      } else {
-        throw Exception('Server returned status: ${response.statusCode}');
+  static int _parseNumericValue(dynamic value, String description, int fallback) {
+    if (value is num) {
+      return value.round();
+    }
+    if (value is String) {
+      final parsed = double.tryParse(value.replaceAll(RegExp(r'[^0-9.-]'), ''));
+      if (parsed != null) {
+        return parsed.round();
       }
-    } catch (e) {
-      print('DeepSeek API Error (generateAlternativeRecipes): $e');
-      return _generateLocalFallbackRecipes(originalMealName, currentKcal);
+    }
+
+    final cleanedDescription = description.toLowerCase();
+    if (cleanedDescription.contains('chicken')) {
+      return fallback + 40;
+    }
+    if (cleanedDescription.contains('salad') || cleanedDescription.contains('vegetable')) {
+      return fallback + 20;
+    }
+    if (cleanedDescription.contains('egg') || cleanedDescription.contains('omelet')) {
+      return fallback + 30;
+    }
+    if (cleanedDescription.contains('fish') || cleanedDescription.contains('salmon') || cleanedDescription.contains('tuna')) {
+      return fallback + 35;
+    }
+    if (cleanedDescription.contains('rice') || cleanedDescription.contains('pasta') || cleanedDescription.contains('bread')) {
+      return fallback + 60;
+    }
+    return fallback;
+  }
+
+  static String _toTitleCase(String value) {
+    final cleaned = value.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (cleaned.isEmpty) {
+      return 'Analyzed Meal';
+    }
+
+    return cleaned
+        .split(' ')
+        .map((part) => part.isEmpty ? part : part[0].toUpperCase() + part.substring(1).toLowerCase())
+        .join(' ');
+  }
+
+  static int _deriveKcal(int baseKcal, int index, String title) {
+    final reduction = 60 + (index * 25);
+    final derived = baseKcal - reduction;
+
+    if (title.toLowerCase().contains('salad')) {
+      return derived < 250 ? 250 : derived;
+    }
+    if (title.toLowerCase().contains('soup')) {
+      return derived < 280 ? 280 : derived;
+    }
+    return derived < 300 ? 300 : derived;
+  }
+
+  static int _deriveMacro(int baseKcal, int index, String type) {
+    final base = (baseKcal * 0.08).round();
+    switch (type) {
+      case 'protein':
+        return base + index * 3 + 20;
+      case 'carbs':
+        return base + index * 2 + 12;
+      case 'fat':
+        return base + index + 6;
+      default:
+        return 0;
     }
   }
 
-  // Local fallback generator for analyzeMealText
+  static String _selectImageForRecipe(String title) {
+    final lowerTitle = title.toLowerCase();
+    if (lowerTitle.contains('salad')) {
+      return 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&q=80&w=600';
+    }
+    if (lowerTitle.contains('salmon') || lowerTitle.contains('fish')) {
+      return 'https://images.unsplash.com/photo-1485962398705-ef6a13c41e8f?auto=format&fit=crop&q=80&w=600';
+    }
+    if (lowerTitle.contains('soup')) {
+      return 'https://images.unsplash.com/photo-1547592166-23ac2d5f2f4c?auto=format&fit=crop&q=80&w=600';
+    }
+    if (lowerTitle.contains('tofu') || lowerTitle.contains('stir')) {
+      return 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&q=80&w=600';
+    }
+    return 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?auto=format&fit=crop&q=80&w=600';
+  }
+
+  static List<String> _toStringList(dynamic value) {
+    if (value is List) {
+      return value.map((item) => item.toString()).toList();
+    }
+    return ['Prepare the ingredients.', 'Cook until done and serve warm.'];
+  }
+
   static Meal _generateLocalFallbackAnalysis(String text) {
     final String cleanText = text.toLowerCase();
     int kcal = 500;
@@ -180,19 +227,34 @@ The JSON array must strictly match this schema:
 
     if (cleanText.contains('chicken') || cleanText.contains('poultry')) {
       name = 'Chicken Meal';
-      kcal = 550; protein = 35; carbs = 40; fat = 12;
+      kcal = 550;
+      protein = 35;
+      carbs = 40;
+      fat = 12;
     } else if (cleanText.contains('egg') || cleanText.contains('omelet')) {
       name = 'Egg Meal';
-      kcal = 320; protein = 18; carbs = 15; fat = 20;
+      kcal = 320;
+      protein = 18;
+      carbs = 15;
+      fat = 20;
     } else if (cleanText.contains('salmon') || cleanText.contains('fish') || cleanText.contains('tuna')) {
       name = 'Fish Meal';
-      kcal = 480; protein = 30; carbs = 20; fat = 18;
+      kcal = 480;
+      protein = 30;
+      carbs = 20;
+      fat = 18;
     } else if (cleanText.contains('salad') || cleanText.contains('vegetable') || cleanText.contains('veggie')) {
       name = 'Salad Bowl';
-      kcal = 280; protein = 8; carbs = 25; fat = 14;
+      kcal = 280;
+      protein = 8;
+      carbs = 25;
+      fat = 14;
     } else if (cleanText.contains('rice') || cleanText.contains('pasta') || cleanText.contains('bread')) {
       name = 'Carb-Rich Meal';
-      kcal = 600; protein = 15; carbs = 90; fat = 10;
+      kcal = 600;
+      protein = 15;
+      carbs = 90;
+      fat = 10;
     }
 
     if (text.length > 3) {
@@ -214,13 +276,11 @@ The JSON array must strictly match this schema:
     );
   }
 
-  // Local fallback generator for recipe alternatives — dynamically varies based on meal
   static List<Map<String, dynamic>> _generateLocalFallbackRecipes(
       String originalName, String kcalStr) {
     final lowerName = originalName.toLowerCase();
     final baseKcal = int.tryParse(kcalStr.replaceAll(RegExp(r'[^0-9]'), '')) ?? 500;
 
-    // Build a pool of contextually relevant recipes
     final List<Map<String, dynamic>> pool = [];
 
     if (lowerName.contains('chicken') || lowerName.contains('poultry') || lowerName.contains('grilled')) {
@@ -294,7 +354,6 @@ The JSON array must strictly match this schema:
       ]);
     }
 
-    // Default fallback recipes that work for any meal
     final List<Map<String, dynamic>> defaults = [
       {
         'title': 'Quinoa Power Bowl with Roasted Vegetables',
@@ -340,10 +399,8 @@ The JSON array must strictly match this schema:
       },
     ];
 
-    // Add defaults to fill up to 3 recipes
     for (final d in defaults) {
       if (pool.length >= 3) break;
-      // Avoid duplicate titles
       if (!pool.any((p) => p['title'] == d['title'])) {
         pool.add(d);
       }
