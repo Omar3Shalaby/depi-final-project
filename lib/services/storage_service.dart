@@ -21,6 +21,12 @@ class DuplicateMealException implements Exception {
 class StorageService {
   static const String _mealsKeyPrefix = 'logged_meals_';
 
+  // Tracks the last local write time per date, to prevent a slow/stale
+  // background Firestore read from overwriting a fresh local change
+  // (e.g. right after a delete or toggle).
+  static final Map<String, DateTime> _lastLocalWrite = {};
+  static const Duration _syncCooldown = Duration(seconds: 8);
+
   // Fixed missing $ character in interpolation
   static String _formatDateKey(DateTime date) {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
@@ -82,6 +88,13 @@ class StorageService {
         .doc(dateKey)
         .get()
         .then((snapshot) async {
+      // Skip overwriting local cache if we just wrote locally — Firestore
+      // may still be propagating that write and could return stale data.
+      final lastWrite = _lastLocalWrite[dateKey];
+      if (lastWrite != null && DateTime.now().difference(lastWrite) < _syncCooldown) {
+        return;
+      }
+
       if (snapshot.exists && snapshot.data() != null) {
         final firestoreMeals = (snapshot.data()!['items'] as List? ?? [])
             .map((item) => Meal.fromJson(Map<String, dynamic>.from(item)))
@@ -155,6 +168,8 @@ class StorageService {
 
   static Future<void> _saveList(DateTime date, List<Meal> meals) async {
     final dateKey = _formatDateKey(date);
+    _lastLocalWrite[dateKey] = DateTime.now();
+
     final prefs = await SharedPreferences.getInstance();
     final key = '$_mealsKeyPrefix$dateKey';
     await prefs.setString(key, jsonEncode(meals.map((m) => m.toJson()).toList()));
