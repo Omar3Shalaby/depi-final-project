@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:nutri_vision/services/notification_service.dart';
 import 'firebase_options.dart';
 import 'Screens/login.dart';
 import 'Screens/main_shell.dart';
@@ -9,6 +10,7 @@ import 'Screens/main_shell.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await NotificationService.init();
   runApp(const ProviderScope(child: MyApp()));
 }
 
