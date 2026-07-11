@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/meal_model.dart';
 
 class AiService {
@@ -31,10 +33,329 @@ class AiService {
   // to ~30 requests/hour per IP. Get your own free key in under a minute
   // (no credit card, instant) at https://fdc.nal.usda.gov/api-key-signup
   // and replace DEMO_KEY with it before shipping.
-  static const String _usdaApiKey = 'DEMO_KEY';
   static const String _usdaBaseUrl = 'https://api.nal.usda.gov/fdc/v1';
   static final Dio _usdaDio = Dio(BaseOptions(baseUrl: _usdaBaseUrl));
 
+  // ── Gemini API ───────────────────────────────────────────────────────
+  static const String _geminiBaseUrl =
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+
+  /// Reads the USDA API key saved by the user in Settings.
+  /// Falls back to public DEMO_KEY if none was set.
+  static Future<String> getUsdaApiKey() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('usda_api_key') ?? 'DEMO_KEY';
+  }
+
+  /// Reads the Gemini API key saved by the user in Settings.
+  static Future<String?> getGeminiApiKey() async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = prefs.getString('gemini_api_key');
+    if (key == null || key.trim().isEmpty) return null;
+    return key.trim();
+  }
+
+  // ── Chatbot ──────────────────────────────────────────────────────────
+
+  /// Generates a single daily nutrition tip using Gemini.
+  /// Returns a Map with 'title' and 'body' keys, or null on failure.
+  static Future<Map<String, String>?> getDailyNutritionTip() async {
+    final apiKey = await getGeminiApiKey();
+    if (apiKey == null) return null;
+
+    const prompt = '''
+Generate one practical daily nutrition tip. Keep it evidence-based, actionable, and friendly.
+Return STRICTLY this JSON format:
+{
+  "title": "Short Title (3-5 words)",
+  "body": "One or two sentences of practical advice."
+}
+''';
+
+    final requestBody = {
+      'contents': [
+        {
+          'parts': [
+            {'text': prompt}
+          ]
+        }
+      ],
+      'generationConfig': {
+        'responseMimeType': 'application/json',
+        'temperature': 0.9,
+        'maxOutputTokens': 120,
+      }
+    };
+
+    try {
+      final response = await Dio().post(
+        _geminiBaseUrl,
+        queryParameters: {'key': apiKey},
+        data: jsonEncode(requestBody),
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+
+      if (response.statusCode == 200) {
+        final candidates = response.data['candidates'] as List?;
+        if (candidates != null && candidates.isNotEmpty) {
+          final parts = candidates[0]['content']['parts'] as List?;
+          if (parts != null && parts.isNotEmpty) {
+            final parsed = jsonDecode(parts[0]['text']?.toString() ?? '{}');
+            final title = parsed['title']?.toString();
+            final body = parsed['body']?.toString();
+            if (title != null && body != null) {
+              return {'title': title, 'body': body};
+            }
+          }
+        }
+      }
+    } catch (_) {
+      // Caller falls back to pool
+    }
+    return null;
+  }
+
+  /// Sends a conversation to Gemini and returns the assistant's reply.
+  ///
+  /// [messages] is the full conversation history as a list of maps:
+  ///   {'role': 'user'|'model', 'text': '...'}
+  /// [userGoals] is a map with keys: calories, protein, carbs, fat.
+  /// [todayMeals] is today's logged meals for context.
+  /// [userName] is the user's display name.
+  static Future<String> getChatbotResponse({
+    required List<Map<String, String>> messages,
+    required Map<String, String> userGoals,
+    required List<Meal> todayMeals,
+    String userName = 'the user',
+  }) async {
+    final apiKey = await getGeminiApiKey();
+    if (apiKey == null) {
+      return "Please add your Gemini API key in Profile → Settings → API Keys to enable the chatbot.";
+    }
+
+    // Build today's meals summary
+    final mealsSummary = todayMeals.isEmpty
+        ? 'No meals logged today yet.'
+        : todayMeals
+            .map((m) =>
+                '- ${m.name}: ${m.kcal} kcal, ${m.protein}g protein, ${m.carbs}g carbs, ${m.fat}g fat')
+            .join('\n');
+
+    final totalKcal = todayMeals.fold(0, (sum, m) => sum + m.kcal);
+    final totalProtein = todayMeals.fold(0, (sum, m) => sum + m.protein);
+    final totalCarbs = todayMeals.fold(0, (sum, m) => sum + m.carbs);
+    final totalFat = todayMeals.fold(0, (sum, m) => sum + m.fat);
+
+    final goalKcal = userGoals['calories'] ?? '2000';
+    final goalProtein = userGoals['protein'] ?? '150';
+    final goalCarbs = userGoals['carbs'] ?? '250';
+    final goalFat = userGoals['fat'] ?? '60';
+
+    final systemPrompt = '''
+You are NutriBot, a friendly and expert nutrition assistant inside the NutriVision app.
+You help users understand their diet, track their nutrition, and make healthier choices.
+
+User: $userName
+Today's Nutrition Goals:
+- Calories: $goalKcal kcal
+- Protein: ${goalProtein}g
+- Carbs: ${goalCarbs}g
+- Fat: ${goalFat}g
+
+Today's Logged Meals:
+$mealsSummary
+
+Today's Totals So Far:
+- Calories: $totalKcal / $goalKcal kcal
+- Protein: $totalProtein / ${goalProtein}g
+- Carbs: $totalCarbs / ${goalCarbs}g
+- Fat: $totalFat / ${goalFat}g
+
+Rules:
+- Always give specific, personalized answers based on the user's actual data above.
+- Never give generic advice that ignores their goals or current intake.
+- If asked about remaining calories/macros, calculate from the data above.
+- Be concise, warm, and supportive.
+- Use emojis sparingly for a friendly tone.
+- Do NOT make up food data. Use the logged meals above as your source of truth.
+- If you don't know something specific, say so honestly.
+''';
+
+    // Build Gemini contents array
+    final contents = <Map<String, dynamic>>[
+      {
+        'role': 'user',
+        'parts': [
+          {'text': systemPrompt},
+        ],
+      },
+      {
+        'role': 'model',
+        'parts': [
+          {
+            'text':
+                'Understood! I have your nutrition goals and today\'s meal data. How can I help you?',
+          },
+        ],
+      },
+    ];
+
+    // Add conversation history
+    for (final msg in messages) {
+      contents.add({
+        'role': msg['role'] == 'user' ? 'user' : 'model',
+        'parts': [
+          {'text': msg['text'] ?? ''},
+        ],
+      });
+    }
+
+    try {
+      final response = await Dio().post(
+        _geminiBaseUrl,
+        queryParameters: {'key': apiKey},
+        data: jsonEncode({
+          'contents': contents,
+          'generationConfig': {
+            'temperature': 0.7,
+            'maxOutputTokens': 600,
+          },
+        }),
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+
+      if (response.statusCode == 200) {
+        final candidates = response.data['candidates'] as List?;
+        if (candidates != null && candidates.isNotEmpty) {
+          final parts = candidates[0]['content']['parts'] as List?;
+          if (parts != null && parts.isNotEmpty) {
+            return parts[0]['text']?.toString() ?? 'No response.';
+          }
+        }
+        return 'I could not generate a response. Please try again.';
+      } else {
+        return 'API error (${response.statusCode}). Please check your Gemini API key in Settings.';
+      }
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 400) {
+        return 'Invalid Gemini API key. Please update it in Profile → Settings → API Keys.';
+      }
+      if (e.response?.statusCode == 429) {
+        return 'Rate limit reached. Please wait a moment before sending another message.';
+      }
+      return 'Network error: ${e.message}. Please check your connection.';
+    } catch (e) {
+      return 'Unexpected error: $e';
+    }
+  }
+
+  /// Analyzes a food image (base64 string) using Gemini Vision.
+  /// Validates if the image is clear and contains food.
+  /// Returns a Meal model or throws an Exception with a validation message.
+  static Future<Meal> analyzeFoodImage(String base64Image, {String mimeType = 'image/jpeg'}) async {
+    final apiKey = await getGeminiApiKey();
+    if (apiKey == null) {
+      throw Exception("Please add your Gemini API key in Profile → Settings → API Keys first.");
+    }
+
+    final prompt = '''
+Identify the food in this image. You must validate if the image contains actual food and is clear enough to recognize.
+If the image is extremely blurry, dark, or does not represent food (e.g., a person, a pet, furniture, document, electronics), respond STRICTLY with this JSON format:
+{
+  "error": "A user-friendly explanation of why the photo is invalid (e.g., 'The photo is too blurry to identify' or 'No food detected in this image')"
+}
+
+If the image contains food, identify it, estimate the portion size, and return STRICTLY this JSON format:
+{
+  "mealName": "Clean Title Case Name of Meal",
+  "calories": integer,
+  "protein": integer,
+  "carbs": integer,
+  "fat": integer
+}
+''';
+
+    final requestBody = {
+      'contents': [
+        {
+          'parts': [
+            {'text': prompt},
+            {
+              'inlineData': {
+                'mimeType': mimeType,
+                'data': base64Image,
+              }
+            }
+          ]
+        }
+      ],
+      'generationConfig': {
+        'responseMimeType': 'application/json',
+        'temperature': 0.2,
+      }
+    };
+
+    try {
+      final response = await Dio().post(
+        _geminiBaseUrl,
+        queryParameters: {'key': apiKey},
+        data: jsonEncode(requestBody),
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+
+      if (response.statusCode == 200) {
+        final candidates = response.data['candidates'] as List?;
+        if (candidates != null && candidates.isNotEmpty) {
+          final parts = candidates[0]['content']['parts'] as List?;
+          if (parts != null && parts.isNotEmpty) {
+            final textResponse = parts[0]['text']?.toString() ?? '{}';
+            final parsedJson = jsonDecode(textResponse.trim());
+
+            if (parsedJson['error'] != null) {
+              throw Exception(parsedJson['error']);
+            }
+
+            final mealName = parsedJson['mealName'] ?? 'Analyzed Food Image';
+            final kcal = parsedJson['calories'] is num ? (parsedJson['calories'] as num).round() : 0;
+            final protein = parsedJson['protein'] is num ? (parsedJson['protein'] as num).round() : 0;
+            final carbs = parsedJson['carbs'] is num ? (parsedJson['carbs'] as num).round() : 0;
+            final fat = parsedJson['fat'] is num ? (parsedJson['fat'] as num).round() : 0;
+
+            return Meal(
+              id: DateTime.now().millisecondsSinceEpoch.toString(),
+              name: mealName,
+              time: _formatTime(DateTime.now()),
+              kcal: kcal,
+              protein: protein,
+              carbs: carbs,
+              fat: fat,
+              icon: 'default',
+            );
+          }
+        }
+        throw Exception('No response generated by the model.');
+      } else {
+        throw Exception('API error (${response.statusCode}). Please verify your Gemini API key in Settings.');
+      }
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 400) {
+        throw Exception('Invalid Gemini API key. Please update it in Profile → Settings → API Keys.');
+      }
+      throw Exception('Network error: ${e.message}');
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Failed to analyze food image: $e');
+    }
+  }
+
+
+  /// Calculates "Estimated Calories" for a logged meal:
+  /// 1. Splits the meal description into individual food items.
+  /// 2. Looks up each item in USDA FoodData Central (per-100g values).
+  /// 3. Scales the result by the specified weight (defaults to 100g).
+  /// 4. If USDA has no match, falls back to Gemini AI estimation.
+  /// 5. If both USDA and Gemini fail (no key/no internet), falls back
+  ///    to a fixed neutral baseline (~350 kcal) as a last resort.
   static Future<Meal> analyzeMealText(String description) async {
     final items = _splitFoodItems(description);
     if (items.isEmpty) {
@@ -60,7 +381,15 @@ class AiService {
     }
 
     if (!anySucceeded) {
-      print('USDA lookup found no matches for "$description", using local fallback.');
+      print('USDA lookup found no matches for "$description", attempting Gemini fallback.');
+      try {
+        final geminiMeal = await _geminiNutritionEstimation(description);
+        if (geminiMeal != null) {
+          return geminiMeal;
+        }
+      } catch (e) {
+        print('Gemini fallback estimation failed: $e');
+      }
       return _generateLocalFallbackAnalysis(description);
     }
 
@@ -228,10 +557,11 @@ class AiService {
     if (query.isEmpty) return null;
 
     try {
+      final usdaKey = await getUsdaApiKey();
       final response = await _usdaDio.get('/foods/search', queryParameters: {
         'query': query,
         'pageSize': 5,
-        'api_key': _usdaApiKey,
+        'api_key': usdaKey,
       });
 
       if (response.statusCode != 200) return null;
@@ -324,48 +654,84 @@ class AiService {
     return ['Prepare the ingredients.', 'Cook until done and serve warm.'];
   }
 
-  static Meal _generateLocalFallbackAnalysis(String text) {
-    final String cleanText = text.toLowerCase();
-    int kcal = 500;
-    int protein = 25;
-    int carbs = 60;
-    int fat = 15;
-    String name = 'Logged Meal';
+  static Future<Meal?> _geminiNutritionEstimation(String description) async {
+    final apiKey = await getGeminiApiKey();
+    if (apiKey == null) return null;
 
-    if (cleanText.contains('chicken') || cleanText.contains('poultry')) {
-      name = 'Chicken Meal';
-      kcal = 550;
-      protein = 35;
-      carbs = 40;
-      fat = 12;
-    } else if (cleanText.contains('egg') || cleanText.contains('omelet')) {
-      name = 'Egg Meal';
-      kcal = 320;
-      protein = 18;
-      carbs = 15;
-      fat = 20;
-    } else if (cleanText.contains('salmon') || cleanText.contains('fish') || cleanText.contains('tuna')) {
-      name = 'Fish Meal';
-      kcal = 480;
-      protein = 30;
-      carbs = 20;
-      fat = 18;
-    } else if (cleanText.contains('salad') || cleanText.contains('vegetable') || cleanText.contains('veggie')) {
-      name = 'Salad Bowl';
-      kcal = 280;
-      protein = 8;
-      carbs = 25;
-      fat = 14;
-    } else if (cleanText.contains('rice') || cleanText.contains('pasta') || cleanText.contains('bread')) {
-      name = 'Carb-Rich Meal';
-      kcal = 600;
-      protein = 15;
-      carbs = 90;
-      fat = 10;
+    final prompt = '''
+Estimate the nutritional value of this meal description: "$description".
+Provide the name of the meal in clean Title Case, estimated calories, protein (in grams), carbohydrates (in grams), and fat (in grams).
+Return STRICTLY this JSON format:
+{
+  "mealName": "Clean Title Case Name of Meal",
+  "calories": integer,
+  "protein": integer,
+  "carbs": integer,
+  "fat": integer
+}
+''';
+
+    final requestBody = {
+      'contents': [
+        {
+          'parts': [
+            {'text': prompt}
+          ]
+        }
+      ],
+      'generationConfig': {
+        'responseMimeType': 'application/json',
+        'temperature': 0.2,
+      }
+    };
+
+    try {
+      final response = await Dio().post(
+        _geminiBaseUrl,
+        queryParameters: {'key': apiKey},
+        data: jsonEncode(requestBody),
+        options: Options(headers: {'Content-Type': 'application/json'}),
+      );
+
+      if (response.statusCode == 200) {
+        final candidates = response.data['candidates'] as List?;
+        if (candidates != null && candidates.isNotEmpty) {
+          final parts = candidates[0]['content']['parts'] as List?;
+          if (parts != null && parts.isNotEmpty) {
+            final textResponse = parts[0]['text']?.toString() ?? '{}';
+            final parsedJson = jsonDecode(textResponse.trim());
+
+            final mealName = parsedJson['mealName'] ?? _toTitleCase(description);
+            final kcal = parsedJson['calories'] is num ? (parsedJson['calories'] as num).round() : 350;
+            final protein = parsedJson['protein'] is num ? (parsedJson['protein'] as num).round() : 15;
+            final carbs = parsedJson['carbs'] is num ? (parsedJson['carbs'] as num).round() : 45;
+            final fat = parsedJson['fat'] is num ? (parsedJson['fat'] as num).round() : 10;
+
+            return Meal(
+              id: DateTime.now().millisecondsSinceEpoch.toString(),
+              name: mealName,
+              time: _formatTime(DateTime.now()),
+              kcal: kcal,
+              protein: protein,
+              carbs: carbs,
+              fat: fat,
+              icon: 'default',
+            );
+          }
+        }
+      }
+    } catch (e) {
+      print('Gemini estimation error: $e');
     }
+    return null;
+  }
 
-    if (text.length > 3) {
-      name = text[0].toUpperCase() + text.substring(1);
+  static Meal _generateLocalFallbackAnalysis(String text) {
+    String name = text.trim();
+    if (name.isEmpty) {
+      name = 'Logged Meal';
+    } else {
+      name = _toTitleCase(name);
       if (name.length > 35) {
         name = '${name.substring(0, 32)}...';
       }
@@ -375,10 +741,10 @@ class AiService {
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       name: name,
       time: _formatTime(DateTime.now()),
-      kcal: kcal,
-      protein: protein,
-      carbs: carbs,
-      fat: fat,
+      kcal: 350,
+      protein: 15,
+      carbs: 45,
+      fat: 10,
       icon: 'default',
     );
   }

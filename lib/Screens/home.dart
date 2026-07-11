@@ -5,7 +5,9 @@ import 'dart:math' as math;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:nutri_vision/services/storage_service.dart';
+import 'package:nutri_vision/services/ai_service.dart';
 import 'package:nutri_vision/providers/app_providers.dart';
+import 'package:nutri_vision/Screens/chat_screen.dart';
 
 /// Pure content widget — Scaffold, background & nav bar live in MainShell.
 class HomeContent extends ConsumerStatefulWidget {
@@ -15,19 +17,39 @@ class HomeContent extends ConsumerStatefulWidget {
   ConsumerState<HomeContent> createState() => _HomeContentState();
 }
 
+// Curated fallback tip pool — used when no Gemini key is set or offline
+const List<Map<String, String>> _tipPool = [
+  {'title': 'Hydrate First', 'body': 'Drink a glass of water before each meal. It aids digestion and helps prevent overeating.'},
+  {'title': 'Protein at Every Meal', 'body': 'Including lean protein at each meal keeps you full longer and supports muscle repair.'},
+  {'title': 'Eat the Rainbow', 'body': 'Aim for five different colored vegetables today — each color brings unique micronutrients.'},
+  {'title': 'Mind Your Portions', 'body': 'Use your hand as a guide: a fist for carbs, a palm for protein, and a thumb for fats.'},
+  {'title': 'Don\'t Skip Breakfast', 'body': 'A balanced breakfast with protein and fiber stabilizes blood sugar and energy through the morning.'},
+  {'title': 'Slow Down', 'body': 'It takes 20 minutes for fullness signals to reach your brain — eat slowly and enjoy every bite.'},
+  {'title': 'Plan Ahead', 'body': 'Spend 10 minutes each morning planning your meals. Planned eating leads to better macro balance.'},
+  {'title': 'Healthy Fats Are Essential', 'body': 'Avocado, nuts, and olive oil provide healthy fats that support brain function and hormone balance.'},
+  {'title': 'Limit Liquid Calories', 'body': 'Sugary drinks and juices add calories quickly with minimal satiety — prefer water or unsweetened tea.'},
+  {'title': 'Sleep to Succeed', 'body': 'Poor sleep increases hunger hormones by up to 24%. Prioritize 7–9 hours for better food choices.'},
+];
+
 class _HomeContentState extends ConsumerState<HomeContent> {
-  String _displayName = 'Ahmad';
+  String _displayName = '';
+  bool _isLoadingName = true;
   int _consumedKcal = 0;
   int _consumedCarbs = 0;
   int _consumedProtein = 0;
   int _consumedFat = 0;
-
   int _goalKcal = 2000;
+
+  // Today's Tip state
+  String _dailyTipTitle = '';
+  String _dailyTip = '';
+  bool _isLoadingTip = true;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _loadDailyTip();
     ref.listenManual<int>(navigationIndexProvider, (previous, next) {
       if (next == 0 && previous != 0) {
         _loadData();
@@ -53,17 +75,83 @@ class _HomeContentState extends ConsumerState<HomeContent> {
 
     final name = prefs.getString('name') ??
         FirebaseAuth.instance.currentUser?.displayName ??
-        'User';
+        '';
 
-    setState(() {
-      _displayName = name;
-      _consumedKcal = kcalSum;
-      _consumedCarbs = carbsSum;
-      _consumedProtein = proteinSum;
-      _consumedFat = fatSum;
+    if (mounted) {
+      setState(() {
+        _displayName = name;
+        _isLoadingName = false;
+        _consumedKcal = kcalSum;
+        _consumedCarbs = carbsSum;
+        _consumedProtein = proteinSum;
+        _consumedFat = fatSum;
+        _goalKcal = int.tryParse(prefs.getString('Calories') ?? '2000') ?? 2000;
+      });
+    }
+  }
 
-      _goalKcal = int.tryParse(prefs.getString('Calories') ?? '2000') ?? 2000;
-    });
+  Future<void> _loadDailyTip() async {
+    final prefs = await SharedPreferences.getInstance();
+    final todayKey = DateTime.now().toIso8601String().substring(0, 10); // 'YYYY-MM-DD'
+    final cachedDate = prefs.getString('tip_date');
+    final cachedTitle = prefs.getString('tip_title');
+    final cachedBody = prefs.getString('tip_body');
+    final cachedSource = prefs.getString('tip_source');
+
+    final geminiKey = await AiService.getGeminiApiKey();
+
+    // Reuse today's cached tip ONLY if it's already a Gemini tip,
+    // OR it's a pool tip and we still have no Gemini key.
+    final hasFreshCache = cachedDate == todayKey && cachedTitle != null && cachedBody != null;
+    final shouldReuseCache = hasFreshCache &&
+        (cachedSource == 'gemini' || (cachedSource == 'pool' && geminiKey == null));
+
+    if (shouldReuseCache) {
+      if (mounted) {
+        setState(() {
+          _dailyTipTitle = cachedTitle;
+          _dailyTip = cachedBody;
+          _isLoadingTip = false;
+        });
+      }
+      return;
+    }
+
+    // Try Gemini first if key is available (covers both: no cache yet, and stale pool cache with a key now present)
+    if (geminiKey != null) {
+      try {
+        final tip = await AiService.getDailyNutritionTip();
+        if (tip != null && mounted) {
+          await prefs.setString('tip_date', todayKey);
+          await prefs.setString('tip_title', tip['title']!);
+          await prefs.setString('tip_body', tip['body']!);
+          await prefs.setString('tip_source', 'gemini');
+          setState(() {
+            _dailyTipTitle = tip['title']!;
+            _dailyTip = tip['body']!;
+            _isLoadingTip = false;
+          });
+          return;
+        }
+      } catch (_) {
+        // Fall through to pool
+      }
+    }
+
+    // Rotate through the curated pool daily (index by day-of-year)
+    final dayOfYear = DateTime.now().difference(DateTime(DateTime.now().year, 1, 1)).inDays;
+    final tip = _tipPool[dayOfYear % _tipPool.length];
+    await prefs.setString('tip_date', todayKey);
+    await prefs.setString('tip_title', tip['title']!);
+    await prefs.setString('tip_body', tip['body']!);
+    await prefs.setString('tip_source', 'pool');
+    if (mounted) {
+      setState(() {
+        _dailyTipTitle = tip['title']!;
+        _dailyTip = tip['body']!;
+        _isLoadingTip = false;
+      });
+    }
   }
 
   @override
@@ -95,33 +183,65 @@ class _HomeContentState extends ConsumerState<HomeContent> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Hello, $_displayName 👋',
-                style: GoogleFonts.poppins(
-                  fontSize: 26,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF2D3748),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.03),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
+              _isLoadingName
+                  ? _buildNameSkeleton()
+                  : Text(
+                      _displayName.isEmpty ? 'Hello! 👋' : 'Hello, $_displayName 👋',
+                      style: GoogleFonts.poppins(
+                        fontSize: 26,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF2D3748),
+                      ),
                     ),
-                  ],
-                ),
-                child: GestureDetector(
-                  onTap: () {
-                    ref.read(navigationIndexProvider.notifier).state = 4;
-                  },
-                  child: const Icon(Icons.person, color: Color(0xFF718096)),
-                ),
+              Row(
+                children: [
+                  // Chat button
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const ChatScreen()),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4A8B5C),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF4A8B5C).withOpacity(0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(Icons.smart_toy_rounded, color: Colors.white, size: 22),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  // Profile button
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.03),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: GestureDetector(
+                      onTap: () {
+                        ref.read(navigationIndexProvider.notifier).state = 4;
+                      },
+                      child: const Icon(Icons.person, color: Color(0xFF718096)),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -286,23 +406,36 @@ class _HomeContentState extends ConsumerState<HomeContent> {
                   ),
                 ),
               ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ChatScreen()),
+                    );
+                  },
+                  child: _buildQuickActionCard(
+                    icon: Icons.smart_toy_rounded,
+                    iconColor: Colors.white,
+                    iconBgColor: const Color(0xFF2C5E3B),
+                    title: 'NutriBot',
+                    subtitle: 'AI nutrition chat',
+                  ),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 24),
 
-          // ── Today's Tip ──────────────────────────────────────
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                "Today's Tip",
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2D3748),
-                ),
-              ),
-            ],
+          // ── Today's Tip ────────────────────────────
+          const Text(
+            "Today's Tip",
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF2D3748),
+            ),
           ),
           const SizedBox(height: 16),
           Container(
@@ -318,50 +451,99 @@ class _HomeContentState extends ConsumerState<HomeContent> {
                 ),
               ],
             ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.lightbulb, color: Color(0xFFD4E157), size: 28),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
+            child: _isLoadingTip
+                ? _buildTipSkeleton()
+                : Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Keep it balanced!',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF2D3748),
+                      const Icon(Icons.lightbulb, color: Color(0xFFD4E157), size: 28),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _dailyTipTitle,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF2D3748),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _dailyTip,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      SizedBox(height: 4),
-                      Text(
-                        "Try to hit your goal ratios. Keep your carbs near 50%, protein near 30%, and fat near 20% for stable daily energy.",
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey,
-                          height: 1.4,
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          shape: BoxShape.circle,
                         ),
+                        child: const Icon(Icons.eco, color: Colors.green),
                       ),
                     ],
                   ),
-                ),
-                const SizedBox(width: 8),
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: Colors.green.shade50,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.eco, color: Colors.green),
-                ),
-              ],
-            ),
           ),
         ],
       ),
+    );
+  }
+
+  // Skeleton shimmer for the welcome name while _loadData() resolves
+  Widget _buildNameSkeleton() {
+    return Container(
+      width: 180,
+      height: 28,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(8),
+      ),
+    );
+  }
+
+  // Skeleton shimmer for the tip card while _loadDailyTip() resolves
+  Widget _buildTipSkeleton() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 120,
+          height: 14,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade200,
+            borderRadius: BorderRadius.circular(6),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          height: 12,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(6),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          width: 200,
+          height: 12,
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(6),
+          ),
+        ),
+      ],
     );
   }
 

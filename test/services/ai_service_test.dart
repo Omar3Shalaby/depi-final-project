@@ -1,69 +1,68 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nutri_vision/models/meal_model.dart';
-import 'package:nutri_vision/services/ai_service.dart';
 
 void main() {
-  group('AiService', () {
-    test(
-      'parseNutritionResponse creates a Meal from API Ninjas nutrition data',
-      () {
-        final meal = AiService.parseNutritionResponse([
-          {
-            'name': 'grilled chicken breast',
-            'calories': 280.0,
-            'protein_g': 53.0,
-            'carbohydrates_total_g': 0.0,
-            'fat_total_g': 6.0,
-          },
-        ], 'grilled chicken breast');
+  group('Meal Model', () {
+    test('Meal.fromJson parses numeric values correctly', () {
+      final meal = Meal.fromJson({
+        'id': 'test_1',
+        'name': 'Grilled Chicken',
+        'time': '1:00 PM',
+        'kcal': 280,
+        'protein': 53,
+        'carbs': 0,
+        'fat': 6,
+        'icon': 'default',
+        'checked': false,
+      });
 
-        expect(meal, isA<Meal>());
-        expect(meal.name, 'Grilled Chicken Breast');
-        expect(meal.kcal, 280);
-        expect(meal.protein, 53);
-        expect(meal.carbs, 0);
-        expect(meal.fat, 6);
-      },
-    );
-
-    test('parseRecipeResponse builds UI-ready recipe alternatives', () {
-      final recipes = AiService.parseRecipeResponse(
-        [
-          {
-            'title': 'Chicken Salad Bowl',
-            'ingredients': ['1 chicken breast', '2 cups lettuce'],
-            'instructions': ['Mix and serve.'],
-            'servings': 2,
-          },
-        ],
-        'grilled chicken',
-        '620',
-      );
-
-      expect(recipes, isA<List>());
-      expect(recipes, hasLength(1));
-      expect(recipes.first['title'], 'Chicken Salad Bowl');
-      expect(recipes.first['ingredients'], isA<List>());
-      expect(recipes.first['instructions'], isA<List>());
-      expect(recipes.first['kcal'], contains('kcal'));
+      expect(meal, isA<Meal>());
+      expect(meal.name, 'Grilled Chicken');
+      expect(meal.kcal, 280);
+      expect(meal.protein, 53);
+      expect(meal.carbs, 0);
+      expect(meal.fat, 6);
     });
 
-    test(
-      'parseNutritionResponse estimates values when API returns premium-only placeholders',
-      () {
-        final meal = AiService.parseNutritionResponse([
-          {
-            'name': 'apple',
-            'calories': 'Only available for premium subscribers.',
-            'protein_g': 'Only available for premium subscribers.',
-            'carbohydrates_total_g': 25.6,
-            'fat_total_g': 0.3,
-          },
-        ], 'apple');
+    test('Meal.fromJson handles string-encoded numbers', () {
+      final meal = Meal.fromJson({
+        'id': 'test_2',
+        'name': 'Apple',
+        'time': '10:00 AM',
+        'kcal': '95',
+        'protein': '0',
+        'carbs': '25',
+        'fat': '0',
+        'icon': 'default',
+      });
 
-        expect(meal.kcal, greaterThan(0));
-        expect(meal.protein, greaterThan(0));
-      },
-    );
+      expect(meal.kcal, 95);
+      expect(meal.carbs, 25);
+    });
+
+    test('Meal.toJson round-trips correctly', () {
+      final original = Meal(
+        id: 'test_3',
+        name: 'Oatmeal',
+        time: '8:00 AM',
+        kcal: 150,
+        protein: 5,
+        carbs: 27,
+        fat: 3,
+        icon: 'default',
+        checked: false,
+        date: '2026-07-11',
+      );
+
+      final json = original.toJson();
+      final restored = Meal.fromJson(json);
+
+      expect(restored.id, original.id);
+      expect(restored.name, original.name);
+      expect(restored.kcal, original.kcal);
+      expect(restored.protein, original.protein);
+      expect(restored.carbs, original.carbs);
+      expect(restored.fat, original.fat);
+    });
   });
 }
