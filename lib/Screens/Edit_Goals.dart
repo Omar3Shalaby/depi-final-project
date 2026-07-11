@@ -10,19 +10,59 @@ class EditGoalsScreen extends StatefulWidget {
   State <EditGoalsScreen> createState() => _EditGoalsScreenState();
 }
 
-class _EditGoalsScreenState extends State<EditGoalsScreen>
-
-{
+class _EditGoalsScreenState extends State<EditGoalsScreen> {
   // TextEditingControllers for each field with default values
   final TextEditingController _caloriesController = TextEditingController();
   final TextEditingController _proteinController = TextEditingController();
   final TextEditingController _carbsController = TextEditingController();
   final TextEditingController _fatController = TextEditingController();
 
+  bool _isLoadingGoals = true;
+  bool _isAutoCalculating = false;
+  String? _macroWarning;
+
   @override
   void initState() {
     super.initState();
     _loadGoals();
+    _caloriesController.addListener(_onCaloriesChanged);
+    _proteinController.addListener(_checkMacroMismatch);
+    _carbsController.addListener(_checkMacroMismatch);
+    _fatController.addListener(_checkMacroMismatch);
+  }
+
+  void _onCaloriesChanged() {
+    if (_isLoadingGoals || _isAutoCalculating) return;
+    final calories = int.tryParse(_caloriesController.text);
+    if (calories == null || calories <= 0) return;
+
+    _isAutoCalculating = true;
+    final proteinG = ((calories * 0.30) / 4).round();
+    final carbsG = ((calories * 0.50) / 4).round();
+    final fatG = ((calories * 0.20) / 9).round();
+    _proteinController.text = proteinG.toString();
+    _carbsController.text = carbsG.toString();
+    _fatController.text = fatG.toString();
+    _isAutoCalculating = false;
+    _checkMacroMismatch();
+  }
+
+  void _checkMacroMismatch() {
+    if (_isLoadingGoals || _isAutoCalculating) return;
+    final calories = int.tryParse(_caloriesController.text) ?? 0;
+    final protein = int.tryParse(_proteinController.text) ?? 0;
+    final carbs = int.tryParse(_carbsController.text) ?? 0;
+    final fat = int.tryParse(_fatController.text) ?? 0;
+
+    final macroCalories = (protein * 4) + (carbs * 4) + (fat * 9);
+    final diff = (macroCalories - calories).abs();
+    final tolerance = calories * 0.1;
+
+    setState(() {
+      _macroWarning = (calories > 0 && diff > tolerance)
+          ? 'Your macros (~$macroCalories kcal) don\'t match your calorie goal ($calories kcal).'
+          : null;
+    });
   }
 
   Future<void> _loadGoals() async {
@@ -32,11 +72,16 @@ class _EditGoalsScreenState extends State<EditGoalsScreen>
       _proteinController.text = prefs.getString('Protein') ?? '150';
       _carbsController.text = prefs.getString('Carbs') ?? '250';
       _fatController.text = prefs.getString('Fat') ?? '60';
+      _isLoadingGoals = false;
     });
   }
 
   @override
   void dispose() {
+    _caloriesController.removeListener(_onCaloriesChanged);
+    _proteinController.removeListener(_checkMacroMismatch);
+    _carbsController.removeListener(_checkMacroMismatch);
+    _fatController.removeListener(_checkMacroMismatch);
     _caloriesController.dispose();
     _proteinController.dispose();
     _carbsController.dispose();
@@ -45,6 +90,18 @@ class _EditGoalsScreenState extends State<EditGoalsScreen>
   }
 
   Future<void> _saveGoals() async {
+    final calories = int.tryParse(_caloriesController.text);
+    if (calories == null || calories < 500 || calories > 10000) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Daily Calories must be between 500 and 10,000 kcal.'),
+          backgroundColor: Colors.redAccent,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('Calories', _caloriesController.text);
     await prefs.setString('Protein', _proteinController.text);
@@ -159,15 +216,27 @@ class _EditGoalsScreenState extends State<EditGoalsScreen>
                             //icon: const Text('🥚', style: TextStyle(fontSize: 20)),
                           ),
                           _buildInputRow(
-                            label: 'Fat',
-                            controller: _fatController,
-                            unit: 'g',
-                            icon: SvgPicture.asset(
-                              'assets/icons/fat.svg',
-                              width: 26,
-                              height: 26,)
+                              label: 'Fat',
+                              controller: _fatController,
+                              unit: 'g',
+                              icon: SvgPicture.asset(
+                                'assets/icons/fat.svg',
+                                width: 26,
+                                height: 26,)
                             //icon: const Text('🍑', style: TextStyle(fontSize: 20)),
                           ),
+                          if (_macroWarning != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: Text(
+                                _macroWarning!,
+                                style: GoogleFonts.nunito(
+                                  fontSize: 13,
+                                  color: Colors.orange[800],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
