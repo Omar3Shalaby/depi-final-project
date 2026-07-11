@@ -391,18 +391,6 @@ class _ProfileContentState extends State<ProfileContent> {
                   ),
                   onTap: null,
                 ),
-                _buildDivider(),
-
-                // Privacy Policy
-                _buildSettingRow(
-                  icon: Icons.shield_rounded,
-                  label: 'Privacy Policy',
-                  trailing: Icon(
-                    Icons.chevron_right_rounded,
-                    color: Colors.grey.shade400,
-                  ),
-                  onTap: () {},
-                ),
                 const SizedBox(height: 8),
               ],
             ),
