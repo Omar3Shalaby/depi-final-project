@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:convert';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -13,12 +16,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   // Controllers
   final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _weightController = TextEditingController();
   final TextEditingController _heightController = TextEditingController();
 
   String _selectedGender = 'Male';
   bool _isLoading = true;
+  String? _profilePicB64;
 
   // Style Constants
   static const Color _primaryGreen = Color(0xFF5F8F7B);
@@ -34,48 +37,131 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   void dispose() {
-    // Clean up controllers to avoid memory leaks
     _nameController.dispose();
-    _emailController.dispose();
     _weightController.dispose();
     _heightController.dispose();
     super.dispose();
   }
 
   Future<void> _loadProfile() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      // Empty strings are used as defaults so hint text handles placeholders
-      _nameController.text = prefs.getString('name') ?? '';
-      _emailController.text = prefs.getString('email') ?? '';
-      _weightController.text = prefs.getString('weight') ?? '';
-      _heightController.text = prefs.getString('height') ?? '';
-      _selectedGender = prefs.getString('gender') ?? 'Male';
-      _isLoading = false;
-    });
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        _nameController.text = data['name'] ?? user.displayName ?? '';
+        _weightController.text = data['weight']?.toString() ?? '';
+        _heightController.text = data['height']?.toString() ?? '';
+        _selectedGender = data['gender'] ?? 'Male';
+        _profilePicB64 = data['photoBase64'];
+      } else {
+        _nameController.text = user.displayName ?? '';
+        _weightController.text = '';
+        _heightController.text = '';
+        _selectedGender = 'Male';
+        _profilePicB64 = null;
+      }
+    } catch (_) {
+      // silently ignore load errors
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    try {
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 60,
+      );
+
+      if (image == null) return;
+
+      final bytes = await image.readAsBytes();
+      final base64String = base64Encode(bytes);
+
+      // Check size limit: ~700KB (716,800 characters)
+      if (base64String.length > 716800) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("Image too large, please choose a smaller photo"),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      setState(() {
+        _profilePicB64 = base64String;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Failed to pick image: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _saveProfile() async {
     if (_formKey.currentState!.validate()) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('name', _nameController.text.trim());
-      await prefs.setString('email', _emailController.text.trim());
-      await prefs.setString('weight', _weightController.text.trim());
-      await prefs.setString('height', _heightController.text.trim());
-      await prefs.setString('gender', _selectedGender);
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile saved successfully!'),
-          backgroundColor: _primaryGreen,
-        ),
-      );
+      setState(() => _isLoading = true);
 
-      // Brief delay to allow the user to see the feedback before returning
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) Navigator.pop(context);
-      });
+      try {
+        final updates = <String, dynamic>{
+          'name': _nameController.text.trim(),
+          'weight': _weightController.text.trim(),
+          'height': _heightController.text.trim(),
+          'gender': _selectedGender,
+          'photoBase64': _profilePicB64,
+        };
+
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .set(updates, SetOptions(merge: true));
+
+        await user.updateDisplayName(_nameController.text.trim());
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile saved successfully!'),
+            backgroundColor: _primaryGreen,
+          ),
+        );
+
+        Future.delayed(const Duration(milliseconds: 1000), () {
+          if (mounted) Navigator.pop(context);
+        });
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to save profile: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -148,28 +234,37 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               ],
                             ),
                             child: Column(
-                              children: [
-                                Stack(
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 50,
-                                      backgroundColor: _lightGrey,
-                                      child: Icon(Icons.person, size: 60, color: Colors.grey[400]),
-                                    ),
-                                    Positioned(
-                                      bottom: 0,
-                                      right: 0,
-                                      child: Container(
-                                        padding: const EdgeInsets.all(4),
-                                        decoration: const BoxDecoration(
-                                          color: _primaryGreen,
-                                          shape: BoxShape.circle,
+                                children: [
+                                  GestureDetector(
+                                    onTap: _pickImage,
+                                    behavior: HitTestBehavior.opaque,
+                                    child: Stack(
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 50,
+                                          backgroundColor: _lightGrey,
+                                          backgroundImage: _profilePicB64 != null && _profilePicB64!.isNotEmpty
+                                              ? MemoryImage(base64Decode(_profilePicB64!))
+                                              : null,
+                                          child: _profilePicB64 != null && _profilePicB64!.isNotEmpty
+                                              ? null
+                                              : Icon(Icons.person, size: 60, color: Colors.grey[400]),
                                         ),
-                                        child: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
-                                      ),
+                                        Positioned(
+                                          bottom: 0,
+                                          right: 0,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(4),
+                                            decoration: const BoxDecoration(
+                                              color: _primaryGreen,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
+                                  ),
                                 const SizedBox(height: 12),
                                 Text(
                                   _nameController.text.isEmpty ? 'Your Name' : _nameController.text,
@@ -222,25 +317,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                   validator: (value) {
                                     if (value == null || value.trim().isEmpty) {
                                       return 'Name is required';
-                                    }
-                                    return null;
-                                  },
-                                ),
-
-                                // Email
-                                _buildInputField(
-                                  label: 'Email',
-                                  controller: _emailController,
-                                  icon: Icons.mail_outline,
-                                  hint: 'Enter Your Email',
-                                  keyboardType: TextInputType.emailAddress,
-                                  validator: (value) {
-                                    if (value == null || value.trim().isEmpty) {
-                                      return 'Email is required';
-                                    }
-                                    final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
-                                    if (!emailRegex.hasMatch(value.trim())) {
-                                      return 'Enter a valid email address';
                                     }
                                     return null;
                                   },

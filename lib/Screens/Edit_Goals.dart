@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_svg/svg.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class EditGoalsScreen extends StatefulWidget {
   const EditGoalsScreen({super.key});
@@ -20,6 +22,10 @@ class _EditGoalsScreenState extends State<EditGoalsScreen> {
   bool _isLoadingGoals = true;
   bool _isAutoCalculating = false;
   String? _macroWarning;
+  int? _suggestedCalories;
+  String? _gender;
+  double? _weight;
+  double? _height;
 
   @override
   void initState() {
@@ -72,6 +78,35 @@ class _EditGoalsScreenState extends State<EditGoalsScreen> {
       _proteinController.text = prefs.getString('Protein') ?? '150';
       _carbsController.text = prefs.getString('Carbs') ?? '250';
       _fatController.text = prefs.getString('Fat') ?? '60';
+    });
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        if (doc.exists && doc.data() != null) {
+          final data = doc.data()!;
+          _gender = data['gender'] ?? 'Male';
+          _weight = double.tryParse(data['weight']?.toString() ?? '');
+          _height = double.tryParse(data['height']?.toString() ?? '');
+
+          if (_weight != null && _height != null) {
+            final double age = 25;
+            double bmr = 0;
+            if (_gender?.toLowerCase() == 'male') {
+              bmr = (10 * _weight!) + (6.25 * _height!) - (5 * age) + 5;
+            } else {
+              bmr = (10 * _weight!) + (6.25 * _height!) - (5 * age) - 161;
+            }
+            _suggestedCalories = (bmr * 1.375).round();
+          }
+        }
+      } catch (_) {
+        // silently ignore calorie suggestion errors
+      }
+    }
+
+    setState(() {
       _isLoadingGoals = false;
     });
   }
@@ -241,6 +276,138 @@ class _EditGoalsScreenState extends State<EditGoalsScreen> {
                       ),
                     ),
                   ),
+
+                  // Suggested Calories Card
+                  if (_suggestedCalories != null)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                      child: Container(
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF2C5E3B), Color(0xFF4A9465)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF2C5E3B).withValues(alpha: 0.25),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.auto_awesome, color: Colors.white70, size: 18),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Suggested for You',
+                                  style: GoogleFonts.nunito(
+                                    color: Colors.white70,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  '$_suggestedCalories',
+                                  style: GoogleFonts.poppins(
+                                    color: Colors.white,
+                                    fontSize: 36,
+                                    fontWeight: FontWeight.bold,
+                                    height: 1.0,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 6),
+                                  child: Text(
+                                    'kcal / day',
+                                    style: GoogleFonts.nunito(
+                                      color: Colors.white70,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Based on your ${_gender?.toLowerCase() ?? 'profile'}, ${_weight?.toStringAsFixed(0) ?? '?'} kg, ${_height?.toStringAsFixed(0) ?? '?'} cm\n(Mifflin-St Jeor · lightly active)',
+                              style: GoogleFonts.nunito(
+                                color: Colors.white60,
+                                fontSize: 12,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            GestureDetector(
+                              onTap: () {
+                                _isAutoCalculating = true;
+                                _caloriesController.text = '$_suggestedCalories';
+                                _isAutoCalculating = false;
+                                _onCaloriesChanged();
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(30),
+                                  border: Border.all(color: Colors.white38),
+                                ),
+                                child: Text(
+                                  '✦ Use this value',
+                                  style: GoogleFonts.nunito(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline, color: Colors.grey, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Add your weight, height, and gender in Edit Profile to see your personalised calorie suggestion.',
+                                style: GoogleFonts.nunito(
+                                  fontSize: 13,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
                   const SizedBox(height: 100), // Extra space to scroll above button
                 ],
               ),

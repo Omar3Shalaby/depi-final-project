@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:nutri_vision/services/storage_service.dart';
 import 'package:nutri_vision/services/ai_service.dart';
 import 'package:nutri_vision/providers/app_providers.dart';
@@ -39,6 +41,7 @@ class _HomeContentState extends ConsumerState<HomeContent> {
   int _consumedProtein = 0;
   int _consumedFat = 0;
   int _goalKcal = 2000;
+  String? _profilePicB64;
 
   // Today's Tip state
   String _dailyTipTitle = '';
@@ -73,13 +76,31 @@ class _HomeContentState extends ConsumerState<HomeContent> {
       fatSum += m.fat;
     }
 
-    final name = prefs.getString('name') ??
-        FirebaseAuth.instance.currentUser?.displayName ??
-        '';
+    final user = FirebaseAuth.instance.currentUser;
+    String name = '';
+    String? photoBase64;
+    if (user != null) {
+      try {
+        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        if (doc.exists && doc.data() != null) {
+          final data = doc.data()!;
+          name = data['name'] ?? user.displayName ?? '';
+          photoBase64 = data['photoBase64'];
+        } else {
+          name = user.displayName ?? '';
+        }
+      } catch (e) {
+        print('Error loading name from Firestore on home: $e');
+        name = user.displayName ?? '';
+      }
+    }
+
+    final finalName = name.isNotEmpty ? name : (prefs.getString('name') ?? 'User');
 
     if (mounted) {
       setState(() {
-        _displayName = name;
+        _displayName = finalName;
+        _profilePicB64 = photoBase64;
         _isLoadingName = false;
         _consumedKcal = kcalSum;
         _consumedCarbs = carbsSum;
@@ -186,7 +207,7 @@ class _HomeContentState extends ConsumerState<HomeContent> {
               _isLoadingName
                   ? _buildNameSkeleton()
                   : Text(
-                      _displayName.isEmpty ? 'Hello! 👋' : 'Hello, $_displayName 👋',
+                      _displayName.isEmpty ? 'Hello!' : 'Hello, $_displayName',
                       style: GoogleFonts.poppins(
                         fontSize: 26,
                         fontWeight: FontWeight.bold,
@@ -238,7 +259,17 @@ class _HomeContentState extends ConsumerState<HomeContent> {
                       onTap: () {
                         ref.read(navigationIndexProvider.notifier).state = 4;
                       },
-                      child: const Icon(Icons.person, color: Color(0xFF718096)),
+                      child: _profilePicB64 != null && _profilePicB64!.isNotEmpty
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(4),
+                              child: Image.memory(
+                                base64Decode(_profilePicB64!),
+                                fit: BoxFit.cover,
+                                width: 24,
+                                height: 24,
+                              ),
+                            )
+                          : const Icon(Icons.person, color: Color(0xFF718096)),
                     ),
                   ),
                 ],

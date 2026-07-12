@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
 import 'dart:math' as math;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -19,6 +21,8 @@ class _ProfileContentState extends State<ProfileContent> {
   bool _notificationsEnabled = true;
   final User? _user = FirebaseAuth.instance.currentUser;
   String _displayName = '';
+  String? _profilePicB64;
+  String _displayEmail = '';
 
   @override
   void initState() {
@@ -38,12 +42,33 @@ class _ProfileContentState extends State<ProfileContent> {
   }
 
   Future<void> _loadName() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _displayName = prefs.getString('name') ??
-          _user?.displayName ??
-          'User Name';
-    });
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        if (mounted) {
+          setState(() {
+            _displayName = data['name'] ?? user.displayName ?? 'User Name';
+            _displayEmail = data['email'] ?? user.email ?? 'user@email.com';
+            _profilePicB64 = data['photoBase64'];
+          });
+        }
+        return;
+      }
+    } catch (e) {
+      print('Error loading name from Firestore: $e');
+    }
+
+    if (mounted) {
+      setState(() {
+        _displayName = user.displayName ?? 'User Name';
+        _displayEmail = user.email ?? 'user@email.com';
+        _profilePicB64 = null;
+      });
+    }
   }
 
   String _calories = '2000';
@@ -111,11 +136,18 @@ class _ProfileContentState extends State<ProfileContent> {
                         color: Colors.grey.shade200,
                       ),
                       child: ClipOval(
-                        child: Icon(
-                          Icons.person,
-                          size: 60,
-                          color: Colors.grey.shade400,
-                        ),
+                        child: _profilePicB64 != null && _profilePicB64!.isNotEmpty
+                            ? Image.memory(
+                                base64Decode(_profilePicB64!),
+                                fit: BoxFit.cover,
+                                width: 90,
+                                height: 90,
+                              )
+                            : Icon(
+                                Icons.person,
+                                size: 60,
+                                color: Colors.grey.shade400,
+                              ),
                       ),
                     ),
                     Positioned(
@@ -156,7 +188,7 @@ class _ProfileContentState extends State<ProfileContent> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _user?.email ?? 'user@email.com',
+                  _displayEmail.isEmpty ? (_user?.email ?? 'user@email.com') : _displayEmail,
                   style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
                 ),
               ],

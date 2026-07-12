@@ -54,11 +54,43 @@ class _AiRecipeAlternativeContentState extends ConsumerState<AiRecipeAlternative
 
   @override
   Widget build(BuildContext context) {
-    final Meal originalMeal = ref.watch(analyzedMealProvider) ?? 
-        Meal(id: 'orig', name: 'Grilled chicken', kcal: 620, protein: 98, carbs: 150, fat: 41, icon: 'rice', time: '1:00 PM');
-    
+    ref.listen<Meal?>(analyzedMealProvider, (previous, next) {
+      if (next == null) {
+        ref.read(alternativesProvider.notifier).clear();
+      }
+    });
+
+    final Meal? originalMeal = ref.watch(analyzedMealProvider);
     final bool isAiLoading = ref.watch(aiLoadingProvider);
     final List<Recipe> alternatives = ref.watch(alternativesProvider);
+
+    if (originalMeal == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.restaurant_menu_rounded,
+                size: 64,
+                color: Colors.grey.shade400,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                "No meal selected. Log a meal and tap 'Find alternative' to see AI recipe suggestions here.",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey.shade600,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return RefreshIndicator(
       color: _primaryGreen,

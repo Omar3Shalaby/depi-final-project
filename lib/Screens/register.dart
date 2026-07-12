@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:nutri_vision/Screens/login.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 // Import your login screen if you want to navigate back to it
 // import 'package:your_app_name/screens/login.dart';
 
@@ -15,12 +16,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
+  String _selectedGender = 'Male';
 
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _weightController = TextEditingController();
+  final _heightController = TextEditingController();
 
   @override
   void dispose() {
@@ -28,6 +32,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _weightController.dispose();
+    _heightController.dispose();
     super.dispose();
   }
 
@@ -161,6 +167,55 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 !_obscureConfirmPassword,
                           ),
                         ),
+                        const SizedBox(height: 16),
+
+                        // Weight Field
+                        _buildTextField(
+                          hint: 'Weight (kg)',
+                          icon: Icons.fitness_center,
+                          controller: _weightController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Height Field
+                        _buildTextField(
+                          hint: 'Height (cm)',
+                          icon: Icons.height,
+                          controller: _heightController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Gender Toggle
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Gender',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey.shade600,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(24),
+                                border: Border.all(color: Colors.grey.shade200),
+                              ),
+                              child: Row(
+                                children: [
+                                  _buildGenderButton('Male'),
+                                  _buildGenderButton('Female'),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 24),
 
                         // Create Account Button
@@ -187,6 +242,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                         // Update display name
                                         await userCredential.user!
                                             .updateDisplayName(name);
+
+                                        // Write document to Firestore
+                                        await FirebaseFirestore.instance
+                                            .collection('users')
+                                            .doc(userCredential.user!.uid)
+                                            .set({
+                                          'name': name,
+                                          'email': email,
+                                          'createdAt': FieldValue.serverTimestamp(),
+                                          'photoBase64': null,
+                                          'weight': _weightController.text.trim(),
+                                          'height': _heightController.text.trim(),
+                                          'gender': _selectedGender,
+                                        });
+
+                                        // Calculate suggested calories from BMR and save as default goal
+                                        final double? weight = double.tryParse(_weightController.text.trim());
+                                        final double? height = double.tryParse(_heightController.text.trim());
+                                        if (weight != null && height != null) {
+                                          const double age = 25;
+                                          double bmr;
+                                          if (_selectedGender == 'Male') {
+                                            bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5;
+                                          } else {
+                                            bmr = (10 * weight) + (6.25 * height) - (5 * age) - 161;
+                                          }
+                                          final int suggestedCalories = (bmr * 1.375).round();
+                                          final int proteinG = ((suggestedCalories * 0.30) / 4).round();
+                                          final int carbsG = ((suggestedCalories * 0.50) / 4).round();
+                                          final int fatG = ((suggestedCalories * 0.20) / 9).round();
+                                          final prefs = await SharedPreferences.getInstance();
+                                          await prefs.setString('Calories', '$suggestedCalories');
+                                          await prefs.setString('Protein', '$proteinG');
+                                          await prefs.setString('Carbs', '$carbsG');
+                                          await prefs.setString('Fat', '$fatG');
+                                        }
 
                                         if (!mounted) return;
 
@@ -312,6 +403,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       obscureText: obscureText,
       keyboardType: keyboardType,
       validator: (value) {
+        // Weight and Height are optional
+        if (hint == 'Weight (kg)' || hint == 'Height (cm)') {
+          if (value != null && value.trim().isNotEmpty && double.tryParse(value.trim()) == null) {
+            return 'Please enter a valid number.';
+          }
+          return null;
+        }
         if (value == null || value.trim().isEmpty) {
           return '$hint is required.';
         }
@@ -356,6 +454,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Color(0xFF4A8B5C)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGenderButton(String label) {
+    final bool isSelected = _selectedGender == label;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedGender = label),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          margin: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFF2C5E3B) : Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: isSelected ? Colors.white : Colors.grey.shade600,
+            ),
+          ),
         ),
       ),
     );
