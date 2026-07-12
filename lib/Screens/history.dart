@@ -123,11 +123,11 @@ class _HistoryContentState extends ConsumerState<HistoryContent> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
+                            color: Colors.black.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.04),
                             blurRadius: 8,
                             offset: const Offset(0, 3),
                           ),
@@ -143,12 +143,12 @@ class _HistoryContentState extends ConsumerState<HistoryContent> {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Meal History',
                           style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF2D3748),
+                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF2D3748),
                           ),
                         ),
                         Text(
@@ -165,11 +165,11 @@ class _HistoryContentState extends ConsumerState<HistoryContent> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(14),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
+                        color: Colors.black.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.04),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),
@@ -213,11 +213,11 @@ class _HistoryContentState extends ConsumerState<HistoryContent> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(40),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.04),
                     blurRadius: 10,
                     offset: const Offset(0, 4),
                   ),
@@ -236,10 +236,10 @@ class _HistoryContentState extends ConsumerState<HistoryContent> {
                   ),
                   Text(
                     _dateLabel,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF2D3748),
+                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF2D3748),
                     ),
                   ),
                   GestureDetector(
@@ -259,11 +259,11 @@ class _HistoryContentState extends ConsumerState<HistoryContent> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).cardColor,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.04),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
@@ -309,12 +309,12 @@ class _HistoryContentState extends ConsumerState<HistoryContent> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   'Meals',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF2D3748),
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF2D3748),
                   ),
                 ),
                 GestureDetector(
@@ -417,11 +417,11 @@ class _HistoryContentState extends ConsumerState<HistoryContent> {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.04),
+                      color: Colors.black.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.04),
                       blurRadius: 16,
                       offset: const Offset(0, 6),
                     ),
@@ -430,7 +430,7 @@ class _HistoryContentState extends ConsumerState<HistoryContent> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Row(
+                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
@@ -438,7 +438,7 @@ class _HistoryContentState extends ConsumerState<HistoryContent> {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF2D3748),
+                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF2D3748),
                           ),
                         ),
                       ],
@@ -449,18 +449,18 @@ class _HistoryContentState extends ConsumerState<HistoryContent> {
                       children: [
                         Text(
                           '$_totalKcal / $_goalKcal kcal',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF2D3748),
+                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF2D3748),
                           ),
                         ),
                         Text(
                           '${_goalKcal > 0 ? ((_totalKcal / _goalKcal) * 100).toStringAsFixed(0) : 0}%',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF2D3748),
+                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF2D3748),
                           ),
                         ),
                       ],
@@ -473,7 +473,7 @@ class _HistoryContentState extends ConsumerState<HistoryContent> {
                             ? (_totalKcal / _goalKcal).clamp(0.0, 1.0)
                             : 0.0,
                         minHeight: 10,
-                        backgroundColor: Colors.grey.shade100,
+                        backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade100,
                         valueColor: const AlwaysStoppedAnimation<Color>(
                           Color(0xFF4A8B5C),
                         ),
@@ -505,10 +505,10 @@ class _HistoryContentState extends ConsumerState<HistoryContent> {
         const SizedBox(height: 6),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 13,
-            color: Color(0xFF2D3748),
+            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF2D3748),
           ),
         ),
         Text(
@@ -577,11 +577,11 @@ class _MealCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.04),
             blurRadius: 14,
             offset: const Offset(0, 5),
           ),
@@ -614,10 +614,10 @@ class _MealCard extends StatelessWidget {
               children: [
                 Text(
                   meal.name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
-                    color: Color(0xFF2D3748),
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF2D3748),
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -632,10 +632,10 @@ class _MealCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   '${meal.kcal} kcal',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF2D3748),
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF2D3748),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -695,12 +695,14 @@ class _MealCard extends StatelessWidget {
                   width: 26,
                   height: 26,
                   decoration: BoxDecoration(
-                    color: isChecked ? const Color(0xFF4A8B5C) : Colors.grey.shade200,
+                    color: isChecked
+                        ? const Color(0xFF4A8B5C)
+                        : (Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade200),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Icons.check,
-                    color: isChecked ? Colors.white : Colors.grey.shade400,
+                    color: isChecked ? Colors.white : (Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade600 : Colors.grey.shade400),
                     size: 14,
                   ),
                 ),

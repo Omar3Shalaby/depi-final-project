@@ -20,8 +20,8 @@ class _AiRecipeAlternativeContentState extends ConsumerState<AiRecipeAlternative
   SharedPreferences? _prefs;
 
   static const Color _primaryGreen = Color(0xFF4A8B5C);
-  static const Color _darkTextColor = Color(0xFF2D3748);
-  static const Color _lightBgGrey = Color(0xFFF5F7F6);
+  Color _darkTextColor(BuildContext context) => Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF2D3748);
+  Color _lightBgGrey(BuildContext context) => Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade900 : const Color(0xFFF5F7F6);
 
   @override
   void initState() {
@@ -82,7 +82,7 @@ class _AiRecipeAlternativeContentState extends ConsumerState<AiRecipeAlternative
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 16,
-                  color: Colors.grey.shade600,
+                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.grey.shade600,
                   height: 1.4,
                 ),
               ),
@@ -110,11 +110,11 @@ class _AiRecipeAlternativeContentState extends ConsumerState<AiRecipeAlternative
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white, 
+                color: Theme.of(context).cardColor, 
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
+                    color: Colors.black.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.04),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),
@@ -125,7 +125,7 @@ class _AiRecipeAlternativeContentState extends ConsumerState<AiRecipeAlternative
                 children: [
                   Text(
                     originalMeal.name, 
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _darkTextColor),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: _darkTextColor(context)),
                   ),
                   const SizedBox(height: 12),
                   Row(
@@ -148,17 +148,17 @@ class _AiRecipeAlternativeContentState extends ConsumerState<AiRecipeAlternative
               Container(
                 height: 300,
                 alignment: Alignment.center,
-                child: const Column(
+                child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    CircularProgressIndicator(color: _primaryGreen),
-                    SizedBox(height: 16),
+                    const CircularProgressIndicator(color: _primaryGreen),
+                    const SizedBox(height: 16),
                     Text(
                       'Generating AI alternatives...',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w500,
-                        color: _darkTextColor,
+                        color: _darkTextColor(context),
                       ),
                     ),
                   ],
@@ -189,6 +189,7 @@ class _AiRecipeAlternativeContentState extends ConsumerState<AiRecipeAlternative
   Widget _buildAlternativeCard(Recipe recipe) {
     return Card(
       elevation: 2,
+      color: Theme.of(context).cardColor,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -199,7 +200,7 @@ class _AiRecipeAlternativeContentState extends ConsumerState<AiRecipeAlternative
               recipe.image,
               fit: BoxFit.cover,
               errorBuilder: (_, __, ___) => Container(
-                color: _lightBgGrey,
+                color: _lightBgGrey(context),
                 child: const Icon(Icons.restaurant, color: Colors.grey, size: 50),
               ),
             ),
@@ -211,7 +212,7 @@ class _AiRecipeAlternativeContentState extends ConsumerState<AiRecipeAlternative
               children: [
                 Text(
                   recipe.title, 
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: _darkTextColor),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: _darkTextColor(context)),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
                 ),
@@ -254,13 +255,13 @@ class _AiRecipeAlternativeContentState extends ConsumerState<AiRecipeAlternative
   Widget _buildPillMacro(String value, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(color: _lightBgGrey, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: _lightBgGrey(context), borderRadius: BorderRadius.circular(12)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 14, color: color),
           const SizedBox(width: 4),
-          Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _darkTextColor)),
+          Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _darkTextColor(context))),
         ],
       ),
     );
@@ -271,8 +272,8 @@ class _AiRecipeAlternativeContentState extends ConsumerState<AiRecipeAlternative
       children: [
         Icon(icon, color: color, size: 20),
         const SizedBox(height: 4),
-        Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _darkTextColor)),
-        Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _darkTextColor(context))),
+        Text(label, style: TextStyle(fontSize: 11, color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.grey)),
       ],
     );
   }

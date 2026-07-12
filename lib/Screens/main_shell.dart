@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/app_providers.dart';
+import '../providers/theme_provider.dart';
 import 'home.dart';
 import 'log_meal.dart';
 import 'history.dart';
@@ -19,14 +20,19 @@ class _MainShellState extends ConsumerState<MainShell> {
   @override
   Widget build(BuildContext context) {
     final currentIndex = ref.watch(navigationIndexProvider);
+    final themeMode = ref.watch(themeModeProvider);
+    final isDark = themeMode == ThemeMode.dark || 
+        (themeMode == ThemeMode.system && MediaQuery.platformBrightnessOf(context) == Brightness.dark);
 
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/images/main_bg.png'),
+            image: AssetImage(isDark
+                ? 'assets/images/main_bg_dark.png'
+                : 'assets/images/main_bg.png'),
             fit: BoxFit.cover,
           ),
         ),
@@ -53,11 +59,11 @@ class _MainShellState extends ConsumerState<MainShell> {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 20, vertical: 12),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(40),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.08),
+                        color: Colors.black.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.08),
                         blurRadius: 24,
                         offset: const Offset(0, 8),
                       ),
@@ -167,7 +173,7 @@ class _NavItem extends StatelessWidget {
                 key: ValueKey(isActive),
                 color: isActive
                     ? const Color(0xFF4A8B5C)
-                    : Colors.grey.shade400,
+                    : (Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade600 : Colors.grey.shade400),
                 size: 26,
               ),
             ),
@@ -180,7 +186,7 @@ class _NavItem extends StatelessWidget {
                     isActive ? FontWeight.bold : FontWeight.normal,
                 color: isActive
                     ? const Color(0xFF4A8B5C)
-                    : Colors.grey.shade500,
+                    : (Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade500 : Colors.grey.shade500),
               ),
               child: Text(label),
             ),

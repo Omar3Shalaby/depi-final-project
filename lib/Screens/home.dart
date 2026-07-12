@@ -9,7 +9,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:nutri_vision/services/storage_service.dart';
 import 'package:nutri_vision/services/ai_service.dart';
 import 'package:nutri_vision/providers/app_providers.dart';
-import 'package:nutri_vision/Screens/chat_screen.dart';
 
 /// Pure content widget — Scaffold, background & nav bar live in MainShell.
 class HomeContent extends ConsumerStatefulWidget {
@@ -21,16 +20,56 @@ class HomeContent extends ConsumerStatefulWidget {
 
 // Curated fallback tip pool — used when no Gemini key is set or offline
 const List<Map<String, String>> _tipPool = [
-  {'title': 'Hydrate First', 'body': 'Drink a glass of water before each meal. It aids digestion and helps prevent overeating.'},
-  {'title': 'Protein at Every Meal', 'body': 'Including lean protein at each meal keeps you full longer and supports muscle repair.'},
-  {'title': 'Eat the Rainbow', 'body': 'Aim for five different colored vegetables today — each color brings unique micronutrients.'},
-  {'title': 'Mind Your Portions', 'body': 'Use your hand as a guide: a fist for carbs, a palm for protein, and a thumb for fats.'},
-  {'title': 'Don\'t Skip Breakfast', 'body': 'A balanced breakfast with protein and fiber stabilizes blood sugar and energy through the morning.'},
-  {'title': 'Slow Down', 'body': 'It takes 20 minutes for fullness signals to reach your brain — eat slowly and enjoy every bite.'},
-  {'title': 'Plan Ahead', 'body': 'Spend 10 minutes each morning planning your meals. Planned eating leads to better macro balance.'},
-  {'title': 'Healthy Fats Are Essential', 'body': 'Avocado, nuts, and olive oil provide healthy fats that support brain function and hormone balance.'},
-  {'title': 'Limit Liquid Calories', 'body': 'Sugary drinks and juices add calories quickly with minimal satiety — prefer water or unsweetened tea.'},
-  {'title': 'Sleep to Succeed', 'body': 'Poor sleep increases hunger hormones by up to 24%. Prioritize 7–9 hours for better food choices.'},
+  {
+    'title': 'Hydrate First',
+    'body':
+        'Drink a glass of water before each meal. It aids digestion and helps prevent overeating.',
+  },
+  {
+    'title': 'Protein at Every Meal',
+    'body':
+        'Including lean protein at each meal keeps you full longer and supports muscle repair.',
+  },
+  {
+    'title': 'Eat the Rainbow',
+    'body':
+        'Aim for five different colored vegetables today — each color brings unique micronutrients.',
+  },
+  {
+    'title': 'Mind Your Portions',
+    'body':
+        'Use your hand as a guide: a fist for carbs, a palm for protein, and a thumb for fats.',
+  },
+  {
+    'title': 'Don\'t Skip Breakfast',
+    'body':
+        'A balanced breakfast with protein and fiber stabilizes blood sugar and energy through the morning.',
+  },
+  {
+    'title': 'Slow Down',
+    'body':
+        'It takes 20 minutes for fullness signals to reach your brain — eat slowly and enjoy every bite.',
+  },
+  {
+    'title': 'Plan Ahead',
+    'body':
+        'Spend 10 minutes each morning planning your meals. Planned eating leads to better macro balance.',
+  },
+  {
+    'title': 'Healthy Fats Are Essential',
+    'body':
+        'Avocado, nuts, and olive oil provide healthy fats that support brain function and hormone balance.',
+  },
+  {
+    'title': 'Limit Liquid Calories',
+    'body':
+        'Sugary drinks and juices add calories quickly with minimal satiety — prefer water or unsweetened tea.',
+  },
+  {
+    'title': 'Sleep to Succeed',
+    'body':
+        'Poor sleep increases hunger hormones by up to 24%. Prioritize 7–9 hours for better food choices.',
+  },
 ];
 
 class _HomeContentState extends ConsumerState<HomeContent> {
@@ -81,7 +120,10 @@ class _HomeContentState extends ConsumerState<HomeContent> {
     String? photoBase64;
     if (user != null) {
       try {
-        final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
         if (doc.exists && doc.data() != null) {
           final data = doc.data()!;
           name = data['name'] ?? user.displayName ?? '';
@@ -95,7 +137,9 @@ class _HomeContentState extends ConsumerState<HomeContent> {
       }
     }
 
-    final finalName = name.isNotEmpty ? name : (prefs.getString('name') ?? 'User');
+    final finalName = name.isNotEmpty
+        ? name
+        : (prefs.getString('name') ?? 'User');
 
     if (mounted) {
       setState(() {
@@ -113,7 +157,10 @@ class _HomeContentState extends ConsumerState<HomeContent> {
 
   Future<void> _loadDailyTip() async {
     final prefs = await SharedPreferences.getInstance();
-    final todayKey = DateTime.now().toIso8601String().substring(0, 10); // 'YYYY-MM-DD'
+    final todayKey = DateTime.now().toIso8601String().substring(
+      0,
+      10,
+    ); // 'YYYY-MM-DD'
     final cachedDate = prefs.getString('tip_date');
     final cachedTitle = prefs.getString('tip_title');
     final cachedBody = prefs.getString('tip_body');
@@ -123,9 +170,12 @@ class _HomeContentState extends ConsumerState<HomeContent> {
 
     // Reuse today's cached tip ONLY if it's already a Gemini tip,
     // OR it's a pool tip and we still have no Gemini key.
-    final hasFreshCache = cachedDate == todayKey && cachedTitle != null && cachedBody != null;
-    final shouldReuseCache = hasFreshCache &&
-        (cachedSource == 'gemini' || (cachedSource == 'pool' && geminiKey == null));
+    final hasFreshCache =
+        cachedDate == todayKey && cachedTitle != null && cachedBody != null;
+    final shouldReuseCache =
+        hasFreshCache &&
+        (cachedSource == 'gemini' ||
+            (cachedSource == 'pool' && geminiKey == null));
 
     if (shouldReuseCache) {
       if (mounted) {
@@ -160,7 +210,9 @@ class _HomeContentState extends ConsumerState<HomeContent> {
     }
 
     // Rotate through the curated pool daily (index by day-of-year)
-    final dayOfYear = DateTime.now().difference(DateTime(DateTime.now().year, 1, 1)).inDays;
+    final dayOfYear = DateTime.now()
+        .difference(DateTime(DateTime.now().year, 1, 1))
+        .inDays;
     final tip = _tipPool[dayOfYear % _tipPool.length];
     await prefs.setString('tip_date', todayKey);
     await prefs.setString('tip_title', tip['title']!);
@@ -185,10 +237,18 @@ class _HomeContentState extends ConsumerState<HomeContent> {
     final double fatKcal = _consumedFat * 9.0;
     final double totalKcalCalculated = carbsKcal + proteinKcal + fatKcal;
 
-    final double carbsPercent = totalKcalCalculated > 0 ? (carbsKcal / totalKcalCalculated) : 0.33;
-    final double proteinPercent = totalKcalCalculated > 0 ? (proteinKcal / totalKcalCalculated) : 0.33;
-    final double fatPercent = totalKcalCalculated > 0 ? (fatKcal / totalKcalCalculated) : 0.34;
-    final double totalFraction = _goalKcal > 0 ? (_consumedKcal / _goalKcal).clamp(0.0, 1.0) : 0.0;
+    final double carbsPercent = totalKcalCalculated > 0
+        ? (carbsKcal / totalKcalCalculated)
+        : 0.33;
+    final double proteinPercent = totalKcalCalculated > 0
+        ? (proteinKcal / totalKcalCalculated)
+        : 0.33;
+    final double fatPercent = totalKcalCalculated > 0
+        ? (fatKcal / totalKcalCalculated)
+        : 0.34;
+    final double totalFraction = _goalKcal > 0
+        ? (_consumedKcal / _goalKcal).clamp(0.0, 1.0)
+        : 0.0;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.only(
@@ -211,45 +271,23 @@ class _HomeContentState extends ConsumerState<HomeContent> {
                       style: GoogleFonts.poppins(
                         fontSize: 26,
                         fontWeight: FontWeight.bold,
-                        color: const Color(0xFF2D3748),
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : const Color(0xFF2D3748),
                       ),
                     ),
-              Row(
-                children: [
-                  // Chat button
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const ChatScreen()),
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF4A8B5C),
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF4A8B5C).withOpacity(0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(Icons.smart_toy_rounded, color: Colors.white, size: 22),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  // Profile button
-                  Container(
-                    padding: const EdgeInsets.all(10),
+              // Profile button
+              Container(
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: Theme.of(context).cardColor,
                       borderRadius: BorderRadius.circular(14),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.03),
+                          color: Colors.black.withOpacity(
+                            Theme.of(context).brightness == Brightness.dark
+                                ? 0.2
+                                : 0.03,
+                          ),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),
@@ -259,7 +297,8 @@ class _HomeContentState extends ConsumerState<HomeContent> {
                       onTap: () {
                         ref.read(navigationIndexProvider.notifier).state = 4;
                       },
-                      child: _profilePicB64 != null && _profilePicB64!.isNotEmpty
+                      child:
+                          _profilePicB64 != null && _profilePicB64!.isNotEmpty
                           ? ClipRRect(
                               borderRadius: BorderRadius.circular(4),
                               child: Image.memory(
@@ -274,19 +313,21 @@ class _HomeContentState extends ConsumerState<HomeContent> {
                   ),
                 ],
               ),
-            ],
-          ),
-          const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
           // ── Today's Nutrition Card ───────────────────────────
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
+                  color: const Color.fromARGB(255, 97, 241, 136).withOpacity(
+                    Theme.of(context).brightness == Brightness.dark
+                        ? 0.2
+                        : 0.03,
+                  ),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -295,12 +336,14 @@ class _HomeContentState extends ConsumerState<HomeContent> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   "Today's Nutrition",
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF2D3748),
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : const Color.fromARGB(255, 45, 72, 49),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -320,6 +363,11 @@ class _HomeContentState extends ConsumerState<HomeContent> {
                               carbsPercent: carbsPercent,
                               proteinPercent: proteinPercent,
                               fatPercent: fatPercent,
+                              ringColor:
+                                  Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? Colors.grey.shade800
+                                  : Colors.grey.shade200,
                             ),
                           ),
                           Column(
@@ -327,10 +375,14 @@ class _HomeContentState extends ConsumerState<HomeContent> {
                             children: [
                               Text(
                                 '$_consumedKcal',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 24,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF2D3748),
+                                  color:
+                                      Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? Colors.white
+                                      : const Color(0xFF2D3748),
                                 ),
                               ),
                               Text(
@@ -377,9 +429,11 @@ class _HomeContentState extends ConsumerState<HomeContent> {
                     children: [
                       TextSpan(
                         text: '$remainingKcal kcal ',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF2D3748),
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white
+                              : const Color(0xFF2D3748),
                           fontSize: 14,
                         ),
                       ),
@@ -396,12 +450,14 @@ class _HomeContentState extends ConsumerState<HomeContent> {
           const SizedBox(height: 24),
 
           // ── Quick Actions ────────────────────────────────────
-          const Text(
+          Text(
             'Quick Actions',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF2D3748),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : const Color(0xFF2D3748),
             ),
           ),
           const SizedBox(height: 16),
@@ -437,46 +493,34 @@ class _HomeContentState extends ConsumerState<HomeContent> {
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const ChatScreen()),
-                    );
-                  },
-                  child: _buildQuickActionCard(
-                    icon: Icons.smart_toy_rounded,
-                    iconColor: Colors.white,
-                    iconBgColor: const Color(0xFF2C5E3B),
-                    title: 'NutriBot',
-                    subtitle: 'AI nutrition chat',
-                  ),
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 24),
 
           // ── Today's Tip ────────────────────────────
-          const Text(
+          Text(
             "Today's Tip",
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF2D3748),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : const Color(0xFF2D3748),
             ),
           ),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
+                  color: Colors.black.withOpacity(
+                    Theme.of(context).brightness == Brightness.dark
+                        ? 0.2
+                        : 0.03,
+                  ),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -487,7 +531,11 @@ class _HomeContentState extends ConsumerState<HomeContent> {
                 : Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(Icons.lightbulb, color: Color(0xFFD4E157), size: 28),
+                      const Icon(
+                        Icons.lightbulb,
+                        color: Color(0xFFD4E157),
+                        size: 28,
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -495,10 +543,14 @@ class _HomeContentState extends ConsumerState<HomeContent> {
                           children: [
                             Text(
                               _dailyTipTitle,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF2D3748),
+                                color:
+                                    Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Colors.white
+                                    : const Color(0xFF2D3748),
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -518,7 +570,9 @@ class _HomeContentState extends ConsumerState<HomeContent> {
                         width: 60,
                         height: 60,
                         decoration: BoxDecoration(
-                          color: Colors.green.shade50,
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.green.shade900.withOpacity(0.3)
+                              : Colors.green.shade50,
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.eco, color: Colors.green),
@@ -537,7 +591,9 @@ class _HomeContentState extends ConsumerState<HomeContent> {
       width: 180,
       height: 28,
       decoration: BoxDecoration(
-        color: Colors.grey.shade200,
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Colors.grey.shade900
+            : Colors.grey.shade200,
         borderRadius: BorderRadius.circular(8),
       ),
     );
@@ -552,7 +608,9 @@ class _HomeContentState extends ConsumerState<HomeContent> {
           width: 120,
           height: 14,
           decoration: BoxDecoration(
-            color: Colors.grey.shade200,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.grey.shade900
+                : Colors.grey.shade200,
             borderRadius: BorderRadius.circular(6),
           ),
         ),
@@ -561,7 +619,9 @@ class _HomeContentState extends ConsumerState<HomeContent> {
           width: double.infinity,
           height: 12,
           decoration: BoxDecoration(
-            color: Colors.grey.shade100,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.grey.shade800
+                : Colors.grey.shade100,
             borderRadius: BorderRadius.circular(6),
           ),
         ),
@@ -570,7 +630,9 @@ class _HomeContentState extends ConsumerState<HomeContent> {
           width: 200,
           height: 12,
           decoration: BoxDecoration(
-            color: Colors.grey.shade100,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.grey.shade800
+                : Colors.grey.shade100,
             borderRadius: BorderRadius.circular(6),
           ),
         ),
@@ -589,9 +651,11 @@ class _HomeContentState extends ConsumerState<HomeContent> {
         const SizedBox(width: 8),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.bold,
-            color: Color(0xFF2D3748),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : const Color(0xFF2D3748),
             fontSize: 14,
           ),
         ),
@@ -611,11 +675,13 @@ class _HomeContentState extends ConsumerState<HomeContent> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withOpacity(
+              Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.03,
+            ),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -635,10 +701,12 @@ class _HomeContentState extends ConsumerState<HomeContent> {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 13,
-              color: Color(0xFF2D3748),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : const Color(0xFF2D3748),
             ),
           ),
           const SizedBox(height: 4),
@@ -660,11 +728,14 @@ class NutritionChartPainter extends CustomPainter {
   final double proteinPercent;
   final double fatPercent;
 
+  final Color ringColor;
+
   NutritionChartPainter({
     required this.totalFraction,
     required this.carbsPercent,
     required this.proteinPercent,
     required this.fatPercent,
+    required this.ringColor,
   });
 
   @override
@@ -678,7 +749,7 @@ class NutritionChartPainter extends CustomPainter {
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round;
 
-    paint.color = Colors.grey.shade200;
+    paint.color = ringColor;
     canvas.drawCircle(center, radius, paint);
 
     if (totalFraction == 0) return;

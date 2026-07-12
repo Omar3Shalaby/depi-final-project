@@ -25,7 +25,7 @@ class _LogMealContentState extends ConsumerState<LogMealContent> {
   Future<void> _showImagePickerOptions() async {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).cardColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -150,18 +150,18 @@ class _LogMealContentState extends ConsumerState<LogMealContent> {
         children: [
           // ── Header ──────────────────────────────────────────
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'Log Meal',
             style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF2C5E3B),
+              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF2C5E3B),
             ),
           ),
           const SizedBox(height: 4),
           Text(
             "What did you eat today?",
-            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
           ),
           const SizedBox(height: 24),
 
@@ -169,7 +169,7 @@ class _LogMealContentState extends ConsumerState<LogMealContent> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
@@ -182,12 +182,12 @@ class _LogMealContentState extends ConsumerState<LogMealContent> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Describe your meal',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF2D3748),
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Color(0xFF2D3748),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -195,7 +195,9 @@ class _LogMealContentState extends ConsumerState<LogMealContent> {
                 // Text Area
                 Container(
                   decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey.shade200),
+                    border: Border.all(
+                      color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade200,
+                    ),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   padding: const EdgeInsets.all(16),
@@ -205,6 +207,9 @@ class _LogMealContentState extends ConsumerState<LogMealContent> {
                       TextField(
                         controller: _mealTextController,
                         maxLines: 4,
+                        style: TextStyle(
+                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                        ),
                         decoration: InputDecoration(
                           hintText:
                               'E.g., grilled chicken with brown rice\nand salad...',
@@ -345,7 +350,7 @@ class _LogMealContentState extends ConsumerState<LogMealContent> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
@@ -358,12 +363,12 @@ class _LogMealContentState extends ConsumerState<LogMealContent> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Log with Photo',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF2D3748),
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Color(0xFF2D3748),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -375,10 +380,12 @@ class _LogMealContentState extends ConsumerState<LogMealContent> {
                       width: double.infinity,
                       height: 160,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF4F9F4),
+                        color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade900 : const Color(0xFFF4F9F4),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: const Color(0xFF4A8B5C).withOpacity(0.2),
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.grey.shade800
+                              : const Color(0xFF4A8B5C).withOpacity(0.2),
                           style: BorderStyle.solid,
                           width: 1,
                         ),
@@ -388,8 +395,10 @@ class _LogMealContentState extends ConsumerState<LogMealContent> {
                         children: [
                           Container(
                             padding: const EdgeInsets.all(12),
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFE8F5E9),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.green.shade900.withOpacity(0.3)
+                                  : const Color(0xFFE8F5E9),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
@@ -501,7 +510,7 @@ class _LogMealContentState extends ConsumerState<LogMealContent> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
@@ -517,7 +526,7 @@ class _LogMealContentState extends ConsumerState<LogMealContent> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.green.shade50,
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.green.shade900.withOpacity(0.3) : Colors.green.shade50,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
@@ -544,7 +553,7 @@ class _LogMealContentState extends ConsumerState<LogMealContent> {
                         'Describe your meal in detail. Example: "Grilled chicken with brown rice, vegetables, and a side salad with vinaigrette." The more detail, the better!',
                         style: TextStyle(
                           fontSize: 14,
-                          color: Colors.grey.shade600,
+                          color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade400 : Colors.grey.shade600,
                           height: 1.5,
                         ),
                       ),

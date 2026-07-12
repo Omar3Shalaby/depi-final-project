@@ -159,23 +159,19 @@ class _EditGoalsScreenState extends State<EditGoalsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    const Color backgroundColor = Color(0xFFEDF4EF);
-    const Color primaryGreen = Color(0xFF2C5E3B);
-    const Color inputBgColor = Colors.white;
-
     return Scaffold(
-      backgroundColor: backgroundColor,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF333333)),
+          icon: Icon(Icons.arrow_back, color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF333333)),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
           'Edit Goals',
           style: GoogleFonts.nunito(
-            color: const Color(0xFF333333),
+            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF333333),
             fontWeight: FontWeight.w600,
           ),
         ),
@@ -194,17 +190,17 @@ class _EditGoalsScreenState extends State<EditGoalsScreen> {
                   ),
 
                   // Daily Goals Label
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24),
-                    child: Text(
-                      'Daily Goals',
-                      style: GoogleFonts.poppins(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF333333),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Text(
+                        'Daily Goals',
+                        style: GoogleFonts.poppins(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF333333),
+                        ),
                       ),
                     ),
-                  ),
 
                   // Form Card
                   Padding(
@@ -212,11 +208,11 @@ class _EditGoalsScreenState extends State<EditGoalsScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: inputBgColor,
+                        color: Theme.of(context).cardColor,
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
+                            color: Colors.black.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.05),
                             blurRadius: 15,
                             offset: const Offset(0, 5),
                           ),
@@ -225,12 +221,14 @@ class _EditGoalsScreenState extends State<EditGoalsScreen> {
                       child: Column(
                         children: [
                           _buildInputRow(
+                            context: context,
                             label: 'Daily Calories',
                             controller: _caloriesController,
                             unit: 'kcal',
                             icon: null,
                           ),
                           _buildInputRow(
+                            context: context,
                             label: 'Protein',
                             controller: _proteinController,
                             unit: 'g',
@@ -241,6 +239,7 @@ class _EditGoalsScreenState extends State<EditGoalsScreen> {
                             //icon: const Text('🧊', style: TextStyle(fontSize: 20)),
                           ),
                           _buildInputRow(
+                            context: context,
                             label: 'Carbs',
                             controller: _carbsController,
                             unit: 'g',
@@ -251,6 +250,7 @@ class _EditGoalsScreenState extends State<EditGoalsScreen> {
                             //icon: const Text('🥚', style: TextStyle(fontSize: 20)),
                           ),
                           _buildInputRow(
+                              context: context,
                               label: 'Fat',
                               controller: _fatController,
                               unit: 'g',
@@ -386,9 +386,9 @@ class _EditGoalsScreenState extends State<EditGoalsScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
+                          color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade900 : Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.grey.shade300),
+                          border: Border.all(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade300),
                         ),
                         child: Row(
                           children: [
@@ -399,7 +399,7 @@ class _EditGoalsScreenState extends State<EditGoalsScreen> {
                                 'Add your weight, height, and gender in Edit Profile to see your personalised calorie suggestion.',
                                 style: GoogleFonts.nunito(
                                   fontSize: 13,
-                                  color: Colors.grey.shade600,
+                                  color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade400 : Colors.grey.shade600,
                                 ),
                               ),
                             ),
@@ -423,7 +423,7 @@ class _EditGoalsScreenState extends State<EditGoalsScreen> {
               child: ElevatedButton(
                 onPressed: _saveGoals,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryGreen,
+                  backgroundColor: const Color(0xFF2C5E3B),
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(30),
@@ -447,6 +447,7 @@ class _EditGoalsScreenState extends State<EditGoalsScreen> {
   }
 
   Widget _buildInputRow({
+    required BuildContext context,
     required String label,
     required TextEditingController controller,
     required String unit,
@@ -477,11 +478,11 @@ class _EditGoalsScreenState extends State<EditGoalsScreen> {
               height: 56,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade900 : Colors.white,
                 borderRadius: BorderRadius.circular(28),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.03),
+                    color: Colors.black.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.03),
                     blurRadius: 5,
                     offset: const Offset(0, 2),
                   ),
@@ -497,7 +498,7 @@ class _EditGoalsScreenState extends State<EditGoalsScreen> {
                       style: GoogleFonts.nunito(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: const Color(0xFF333333),
+                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF333333),
                       ),
                       decoration: const InputDecoration(
                         border: InputBorder.none,

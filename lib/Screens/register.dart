@@ -43,9 +43,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/images/register_bg.png'),
+            image: AssetImage(Theme.of(context).brightness == Brightness.dark
+                ? 'assets/images/register_bg_dark.png'
+                : 'assets/images/register_bg.png'),
             fit: BoxFit.cover,
           ),
         ),
@@ -93,12 +95,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 1),
                   child: Align(
                     alignment: Alignment.center,
-                    child: const Text(
+                    child: Text(
                       'Create Account',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF4A4A4A),
+                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF4A4A4A),
                       ),
                     ),
                   ),
@@ -111,11 +113,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   margin: const EdgeInsets.symmetric(horizontal: 24),
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
+                        color: Colors.black.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.05),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),
@@ -203,9 +205,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             Container(
                               height: 48,
                               decoration: BoxDecoration(
-                                color: Colors.grey.shade100,
+                                color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade900 : Colors.grey.shade100,
                                 borderRadius: BorderRadius.circular(24),
-                                border: Border.all(color: Colors.grey.shade200),
+                                border: Border.all(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade200),
                               ),
                               child: Row(
                                 children: [
@@ -402,6 +404,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
+      style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87),
       validator: (value) {
         // Weight and Height are optional
         if (hint == 'Weight (kg)' || hint == 'Height (cm)') {
@@ -445,11 +448,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
         contentPadding: const EdgeInsets.symmetric(vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade200),
+          borderSide: BorderSide(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade200),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade200),
+          borderSide: BorderSide(color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade200),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),

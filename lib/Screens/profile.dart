@@ -9,15 +9,18 @@ import 'package:nutri_vision/Screens/login.dart';
 import 'package:nutri_vision/Screens/Edit_Profile.dart';
 import 'package:nutri_vision/Screens/Edit_Goals.dart';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:nutri_vision/providers/theme_provider.dart';
+
 /// Pure content widget — Scaffold, background & nav bar live in MainShell.
-class ProfileContent extends StatefulWidget {
+class ProfileContent extends ConsumerStatefulWidget {
   const ProfileContent({super.key});
 
   @override
-  State<ProfileContent> createState() => _ProfileContentState();
+  ConsumerState<ProfileContent> createState() => _ProfileContentState();
 }
 
-class _ProfileContentState extends State<ProfileContent> {
+class _ProfileContentState extends ConsumerState<ProfileContent> {
   bool _notificationsEnabled = true;
   final User? _user = FirebaseAuth.instance.currentUser;
   String _displayName = '';
@@ -94,12 +97,14 @@ class _ProfileContentState extends State<ProfileContent> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── Header ────────────────────────────────────────────
-          const Text(
+          Text(
             'Profile',
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF2D3748),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : const Color(0xFF2D3748),
             ),
           ),
           const SizedBox(height: 20),
@@ -109,7 +114,7 @@ class _ProfileContentState extends State<ProfileContent> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
@@ -133,7 +138,9 @@ class _ProfileContentState extends State<ProfileContent> {
                           color: const Color(0xFF4A8B5C),
                           width: 3,
                         ),
-                        color: Colors.grey.shade200,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.grey.shade800
+                            : Colors.grey.shade200,
                       ),
                       child: ClipOval(
                         child: _profilePicB64 != null && _profilePicB64!.isNotEmpty
@@ -180,10 +187,12 @@ class _ProfileContentState extends State<ProfileContent> {
                 const SizedBox(height: 14),
                 Text(
                   _displayName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF2D3748),
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : const Color(0xFF2D3748),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -200,7 +209,7 @@ class _ProfileContentState extends State<ProfileContent> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
@@ -218,12 +227,14 @@ class _ProfileContentState extends State<ProfileContent> {
                   children: [
                     const Text('🏃', style: TextStyle(fontSize: 18)),
                     const SizedBox(width: 8),
-                    const Text(
+                    Text(
                       'Health Goals',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF2D3748),
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : const Color(0xFF2D3748),
                       ),
                     ),
                   ],
@@ -247,6 +258,9 @@ class _ProfileContentState extends State<ProfileContent> {
                               carbs: double.parse(_carbs.replaceAll('g', '').trim().isEmpty ? '250' : _carbs.replaceAll('g', '').trim()),
                               protein: double.parse(_protein.replaceAll('g', '').trim().isEmpty ? '150' : _protein.replaceAll('g', '').trim()),
                               fat: double.parse(_fat.replaceAll('g', '').trim().isEmpty ? '60' : _fat.replaceAll('g', '').trim()),
+                              ringColor: Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.grey.shade800
+                                  : Colors.grey.shade100,
                                ),
                             ),
                           ),
@@ -258,7 +272,9 @@ class _ProfileContentState extends State<ProfileContent> {
                                 style: TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF2D3748),
+                                  color: Theme.of(context).brightness == Brightness.dark
+                                      ? Colors.white
+                                      : const Color(0xFF2D3748),
                                 ),
                               ),
                               Text(
@@ -280,12 +296,14 @@ class _ProfileContentState extends State<ProfileContent> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Daily Nutrition Goals',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF2D3748),
+                              color: Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.white
+                                  : const Color(0xFF2D3748),
                             ),
                           ),
                           const SizedBox(height: 10),
@@ -350,7 +368,7 @@ class _ProfileContentState extends State<ProfileContent> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
@@ -423,6 +441,23 @@ class _ProfileContentState extends State<ProfileContent> {
                   ),
                   onTap: null,
                 ),
+                _buildDivider(),
+
+                // Dark Mode Toggle
+                _buildSettingRow(
+                  icon: Icons.dark_mode_rounded,
+                  label: 'Dark Mode',
+                  trailing: Switch(
+                    value: ref.watch(themeModeProvider) == ThemeMode.dark,
+                    activeColor: Colors.white,
+                    activeTrackColor: const Color(0xFF4A8B5C),
+                    inactiveTrackColor: Colors.grey.shade300,
+                    onChanged: (val) {
+                      ref.read(themeModeProvider.notifier).toggleTheme(val);
+                    },
+                  ),
+                  onTap: null,
+                ),
                 const SizedBox(height: 8),
               ],
             ),
@@ -488,16 +523,23 @@ class _ProfileContentState extends State<ProfileContent> {
             const SizedBox(width: 8),
             Text(
               goal,
-              style: const TextStyle(fontSize: 12, color: Color(0xFF2D3748)),
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white70
+                    : const Color(0xFF2D3748),
+              ),
             ),
           ],
         ),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF2D3748),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : const Color(0xFF2D3748),
           ),
         ),
       ],
@@ -520,7 +562,9 @@ class _ProfileContentState extends State<ProfileContent> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFFE8F5E9),
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFF2C5E3B).withOpacity(0.2)
+                    : const Color(0xFFE8F5E9),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(icon, color: const Color(0xFF4A8B5C), size: 18),
@@ -529,10 +573,12 @@ class _ProfileContentState extends State<ProfileContent> {
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF2D3748),
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white
+                      : const Color(0xFF2D3748),
                 ),
               ),
             ),
@@ -544,19 +590,20 @@ class _ProfileContentState extends State<ProfileContent> {
   }
 
   Widget _buildDivider() =>
-      Divider(height: 1, color: Colors.grey.shade100, indent: 44);
+      Divider(height: 1, color: Colors.grey.withOpacity(0.15), indent: 44);
 }
 
-// ── Goal Donut Chart Painter ──────────────────────────────────────────────────
 class _GoalChartPainter extends CustomPainter {
   final double carbs;
   final double protein;
   final double fat;
+  final Color ringColor;
 
   _GoalChartPainter({
     required this.carbs,
     required this.protein,
     required this.fat,
+    required this.ringColor,
   });
 
   @override
@@ -579,7 +626,7 @@ class _GoalChartPainter extends CustomPainter {
     final fatAngle = (fat / total) * 2 * math.pi;
 
     // Background ring
-    paint.color = Colors.grey.shade100;
+    paint.color = ringColor;
     canvas.drawCircle(center, radius, paint);
 
     // Carbs — orange

@@ -18,8 +18,8 @@ class _AiRecipeDetailsScreenState extends State<AiRecipeDetailsScreen> {
   final Set<int> _checkedIngredients = {};
 
   static const Color _primaryGreen = Color(0xFF4A8B5C);
-  static const Color _darkTextColor = Color(0xFF2D3748);
-  static const Color _lightBgGrey = Color(0xFFF5F7F6);
+  Color _darkTextColor(BuildContext context) => Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF2D3748);
+  Color _lightBgGrey(BuildContext context) => Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade900 : const Color(0xFFF5F7F6);
 
   int _parseNumericValue(String val) {
     final match = RegExp(r'\d+').firstMatch(val);
@@ -52,7 +52,10 @@ class _AiRecipeDetailsScreenState extends State<AiRecipeDetailsScreen> {
     try {
       await StorageService.saveMeal(now, newMeal);
       // Trigger notification about the meal
-      NotificationService.showMealAnalysisNotification(newMeal.name, newMeal.kcal).catchError((_) {});
+      NotificationService.showMealAnalysisNotification(
+        newMeal.name,
+        newMeal.kcal,
+      ).catchError((_) {});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -83,7 +86,9 @@ class _AiRecipeDetailsScreenState extends State<AiRecipeDetailsScreen> {
               children: [
                 Icon(Icons.info_outline, color: Colors.white, size: 20),
                 SizedBox(width: 10),
-                Expanded(child: Text('This meal has already been logged today.')),
+                Expanded(
+                  child: Text('This meal has already been logged today.'),
+                ),
               ],
             ),
             duration: Duration(seconds: 3),
@@ -97,9 +102,17 @@ class _AiRecipeDetailsScreenState extends State<AiRecipeDetailsScreen> {
             backgroundColor: Colors.redAccent,
             content: Row(
               children: [
-                Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
                 SizedBox(width: 10),
-                Expanded(child: Text('Daily limit of 5 meals reached. Delete a meal to add more.')),
+                Expanded(
+                  child: Text(
+                    'Daily limit of 5 meals reached. Delete a meal to add more.',
+                  ),
+                ),
               ],
             ),
             duration: Duration(seconds: 3),
@@ -123,7 +136,7 @@ class _AiRecipeDetailsScreenState extends State<AiRecipeDetailsScreen> {
     final r = widget.recipe;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: CustomScrollView(
         slivers: [
           // ── Beautiful Sliver Image Header ──
@@ -143,8 +156,12 @@ class _AiRecipeDetailsScreenState extends State<AiRecipeDetailsScreen> {
                 r.image,
                 fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => Container(
-                  color: _lightBgGrey,
-                  child: const Icon(Icons.restaurant, color: Colors.grey, size: 50),
+                  color: _lightBgGrey(context),
+                  child: const Icon(
+                    Icons.restaurant,
+                    color: Colors.grey,
+                    size: 50,
+                  ),
                 ),
               ),
             ),
@@ -162,18 +179,21 @@ class _AiRecipeDetailsScreenState extends State<AiRecipeDetailsScreen> {
                     Expanded(
                       child: Text(
                         r.title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
-                          color: _darkTextColor,
+                          color: _darkTextColor(context),
                         ),
                       ),
                     ),
                     if (r.savings.isNotEmpty)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE8F5E9),
+                          color: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF2C5E3B).withOpacity(0.2) : const Color(0xFFE8F5E9),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
@@ -188,45 +208,86 @@ class _AiRecipeDetailsScreenState extends State<AiRecipeDetailsScreen> {
                   ],
                 ),
                 const SizedBox(height: 6),
-                
+
                 // Recipe swap description
                 if (r.desc.isNotEmpty)
                   Text(
                     r.desc,
-                    style: TextStyle(color: Colors.grey.shade600, height: 1.4, fontSize: 14),
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      height: 1.4,
+                      fontSize: 14,
+                    ),
                   ),
                 const SizedBox(height: 18),
 
                 // Preparation Time Row
                 Row(
                   children: [
-_buildTimeBadge('Prep Time', r.prepTime, Icons.access_time_rounded),                    const SizedBox(width: 16),
-                    _buildTimeBadge('Cook Time', r.cookTime, Icons.local_fire_department_rounded),
+                    _buildTimeBadge(
+                      'Prep Time',
+                      r.prepTime,
+                      Icons.access_time_rounded,
+                    ),
+                    const SizedBox(width: 16),
+                    _buildTimeBadge(
+                      'Cook Time',
+                      r.cookTime,
+                      Icons.local_fire_department_rounded,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 24),
 
                 // Macros Section
-                const Text(
+                Text(
                   'Nutritional Content',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _darkTextColor),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: _darkTextColor(context),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildMacroSquare('Calories', r.kcal, const Color(0xFFFFF3E0), const Color(0xFFF2A65A)),
-                    _buildMacroSquare('Protein', r.protein, const Color(0xFFE3F2FD), const Color(0xFF5A92D6)),
-                    _buildMacroSquare('Carbs', r.carbs, const Color(0xFFE8F5E9), _primaryGreen),
-                    _buildMacroSquare('Fat', r.fat, const Color(0xFFFFEBEE), const Color(0xFFEF9A9A)),
+                    _buildMacroSquare(
+                      'Calories',
+                      r.kcal,
+                      Theme.of(context).brightness == Brightness.dark ? Colors.orange.shade900.withOpacity(0.2) : const Color(0xFFFFF3E0),
+                      const Color(0xFFF2A65A),
+                    ),
+                    _buildMacroSquare(
+                      'Protein',
+                      r.protein,
+                      Theme.of(context).brightness == Brightness.dark ? Colors.blue.shade900.withOpacity(0.2) : const Color(0xFFE3F2FD),
+                      const Color(0xFF5A92D6),
+                    ),
+                    _buildMacroSquare(
+                      'Carbs',
+                      r.carbs,
+                      Theme.of(context).brightness == Brightness.dark ? Colors.green.shade900.withOpacity(0.2) : const Color(0xFFE8F5E9),
+                      _primaryGreen,
+                    ),
+                    _buildMacroSquare(
+                      'Fat',
+                      r.fat,
+                      Theme.of(context).brightness == Brightness.dark ? Colors.red.shade900.withOpacity(0.2) : const Color(0xFFFFEBEE),
+                      const Color(0xFFEF9A9A),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 28),
 
                 // Ingredients checklist Section
-                const Text(
+                Text(
                   'Ingredients',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _darkTextColor),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: _darkTextColor(context),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 if (r.ingredients.isEmpty)
@@ -238,15 +299,19 @@ _buildTimeBadge('Prep Time', r.prepTime, Icons.access_time_rounded),            
                     return ListTile(
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(
-                        isChecked ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                        isChecked
+                            ? Icons.check_box_rounded
+                            : Icons.check_box_outline_blank_rounded,
                         color: isChecked ? _primaryGreen : Colors.grey.shade400,
                       ),
                       title: Text(
                         item,
                         style: TextStyle(
                           fontSize: 14,
-                          decoration: isChecked ? TextDecoration.lineThrough : null,
-                          color: isChecked ? Colors.grey : _darkTextColor,
+                          decoration: isChecked
+                              ? TextDecoration.lineThrough
+                              : null,
+                          color: isChecked ? Colors.grey : _darkTextColor(context),
                         ),
                       ),
                       onTap: () {
@@ -263,9 +328,13 @@ _buildTimeBadge('Prep Time', r.prepTime, Icons.access_time_rounded),            
                 const SizedBox(height: 24),
 
                 // Numbered Steps Instructions Section
-                const Text(
+                Text(
                   'Instructions',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _darkTextColor),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: _darkTextColor(context),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 if (r.instructions.isEmpty)
@@ -280,17 +349,25 @@ _buildTimeBadge('Prep Time', r.prepTime, Icons.access_time_rounded),            
                         children: [
                           CircleAvatar(
                             radius: 12,
-                            backgroundColor: const Color(0xFFE8F5E9),
+                            backgroundColor: Theme.of(context).brightness == Brightness.dark ? const Color(0xFF2C5E3B).withOpacity(0.2) : const Color(0xFFE8F5E9),
                             child: Text(
                               '${idx + 1}',
-                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _primaryGreen),
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: _primaryGreen,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               step,
-                              style: const TextStyle(fontSize: 14, height: 1.4, color: _darkTextColor),
+                              style: TextStyle(
+                                fontSize: 14,
+                                height: 1.4,
+                                color: _darkTextColor(context),
+                              ),
                             ),
                           ),
                         ],
@@ -316,7 +393,10 @@ _buildTimeBadge('Prep Time', r.prepTime, Icons.access_time_rounded),            
                     icon: const Icon(Icons.add_task_rounded, size: 20),
                     label: const Text(
                       'Log This Meal',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     onPressed: _logAlternativeToHistory,
                   ),
@@ -334,7 +414,7 @@ _buildTimeBadge('Prep Time', r.prepTime, Icons.access_time_rounded),            
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: _lightBgGrey,
+        color: _lightBgGrey(context),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -343,11 +423,19 @@ _buildTimeBadge('Prep Time', r.prepTime, Icons.access_time_rounded),            
           const SizedBox(width: 6),
           Text(
             '$title: ',
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.grey),
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey,
+            ),
           ),
           Text(
             value,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: _darkTextColor),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: _darkTextColor(context),
+            ),
           ),
         ],
       ),
@@ -366,12 +454,20 @@ _buildTimeBadge('Prep Time', r.prepTime, Icons.access_time_rounded),            
         children: [
           Text(
             value,
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
-            style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w500),
+            style: const TextStyle(
+              fontSize: 10,
+              color: Colors.grey,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),

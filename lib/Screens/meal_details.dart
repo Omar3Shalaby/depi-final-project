@@ -58,11 +58,13 @@ class _MealDetailsScreenState extends ConsumerState<MealDetailsScreen> {
     if (meal == null) {
       return Scaffold(
         body: Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFFE8F2EC), Color(0xFFF1F5F2)],
+              colors: Theme.of(context).brightness == Brightness.dark
+                  ? [const Color(0xFF1B2F23), const Color(0xFF121212)]
+                  : [const Color(0xFFE8F2EC), const Color(0xFFF1F5F2)],
             ),
           ),
           child: SafeArea(
@@ -74,8 +76,8 @@ class _MealDetailsScreenState extends ConsumerState<MealDetailsScreen> {
                   children: [
                     Container(
                       padding: const EdgeInsets.all(20),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).cardColor,
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -85,12 +87,12 @@ class _MealDetailsScreenState extends ConsumerState<MealDetailsScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    const Text(
+                    Text(
                       'No Meal Analyzed Yet',
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF333333),
+                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF333333),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -151,12 +153,14 @@ class _MealDetailsScreenState extends ConsumerState<MealDetailsScreen> {
 
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFFE8F2EC), Color(0xFFF1F5F2)],
-            stops: [0.0, 1.0],
+            colors: Theme.of(context).brightness == Brightness.dark
+                ? [const Color(0xFF1B2F23), const Color(0xFF121212)]
+                : [const Color(0xFFE8F2EC), const Color(0xFFF1F5F2)],
+            stops: const [0.0, 1.0],
           ),
         ),
         child: SafeArea(
@@ -181,18 +185,18 @@ class _MealDetailsScreenState extends ConsumerState<MealDetailsScreen> {
                                         .read(navigationIndexProvider.notifier)
                                         .state =
                                     2,
-                            child: const Icon(
+                            child: Icon(
                               Icons.arrow_back,
-                              color: Color(0xFF3B694D),
+                              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF3B694D),
                             ),
                           ),
                           const SizedBox(width: 16),
-                          const Text(
+                          Text(
                             'Meal Analysis',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF3B694D),
+                              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF3B694D),
                             ),
                           ),
                           const Spacer(),
@@ -205,26 +209,26 @@ class _MealDetailsScreenState extends ConsumerState<MealDetailsScreen> {
                       padding: const EdgeInsets.all(16),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(32),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.04),
-                              blurRadius: 15,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
+                            color: Theme.of(context).cardColor,
+                            borderRadius: BorderRadius.circular(32),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.04),
+                                blurRadius: 15,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
                         ),
                         padding: const EdgeInsets.all(24),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
+                            Text(
                               'AI Analysis Result',
                               style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.w700,
-                                color: Color(0xFF333333),
+                                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF333333),
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -245,19 +249,21 @@ class _MealDetailsScreenState extends ConsumerState<MealDetailsScreen> {
                                 vertical: 16,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFFFF9E6),
+                                color: Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.orange.shade900.withOpacity(0.2)
+                                    : const Color(0xFFFFF9E6),
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Estimated Calories:',
                                     style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
-                                      color: Color(0xFF333333),
+                                      color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF333333),
                                     ),
                                   ),
                                   RichText(
@@ -265,10 +271,10 @@ class _MealDetailsScreenState extends ConsumerState<MealDetailsScreen> {
                                       children: [
                                         TextSpan(
                                           text: '$kcal ',
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 22,
                                             fontWeight: FontWeight.w700,
-                                            color: Color(0xFF333333),
+                                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF333333),
                                           ),
                                         ),
                                         const TextSpan(
@@ -309,10 +315,10 @@ class _MealDetailsScreenState extends ConsumerState<MealDetailsScreen> {
                               const Color(0xFF54E34F),
                             ),
 
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 24),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 24),
                               child: Divider(
-                                color: Color(0xFFEEEEEE),
+                                color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : const Color(0xFFEEEEEE),
                                 height: 1,
                               ),
                             ),
@@ -332,6 +338,7 @@ class _MealDetailsScreenState extends ConsumerState<MealDetailsScreen> {
                                           carbsPercent: carbsPercent,
                                           proteinPercent: proteinPercent,
                                           fatPercent: fatPercent,
+                                          ringColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : const Color(0xFFEEEEEE),
                                         ),
                                       ),
                                       Column(
@@ -339,10 +346,10 @@ class _MealDetailsScreenState extends ConsumerState<MealDetailsScreen> {
                                         children: [
                                           Text(
                                             '$kcal',
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 20,
                                               fontWeight: FontWeight.w700,
-                                              color: Color(0xFF333333),
+                                              color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF333333),
                                             ),
                                           ),
                                           const Text(
@@ -697,15 +704,15 @@ class _MealDetailsScreenState extends ConsumerState<MealDetailsScreen> {
         const SizedBox(width: 10),
         Text(
           label,
-          style: const TextStyle(fontSize: 13, color: Color(0xFF666666)),
+          style: TextStyle(fontSize: 13, color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : const Color(0xFF666666)),
         ),
         const Spacer(),
         Text(
           percent,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF333333),
+            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : const Color(0xFF333333),
           ),
         ),
       ],
@@ -718,10 +725,13 @@ class DonutChartPainter extends CustomPainter {
   final double proteinPercent;
   final double fatPercent;
 
+  final Color ringColor;
+
   DonutChartPainter({
     required this.carbsPercent,
     required this.proteinPercent,
     required this.fatPercent,
+    required this.ringColor,
   });
 
   @override
@@ -737,7 +747,7 @@ class DonutChartPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     // Background track
-    paint.color = const Color(0xFFEEEEEE);
+    paint.color = ringColor;
     canvas.drawArc(rect, 0, 2 * math.pi, false, paint);
 
     // Total ratio sum to normalize just in case
