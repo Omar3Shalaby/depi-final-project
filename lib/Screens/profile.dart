@@ -1,18 +1,93 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
 import 'dart:math' as math;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:nutri_vision/Screens/login.dart';
+import 'package:nutri_vision/Screens/Edit_Profile.dart';
+import 'package:nutri_vision/Screens/Edit_Goals.dart';
+
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:nutri_vision/providers/theme_provider.dart';
 
 /// Pure content widget — Scaffold, background & nav bar live in MainShell.
-class ProfileContent extends StatefulWidget {
+class ProfileContent extends ConsumerStatefulWidget {
   const ProfileContent({super.key});
 
   @override
-  State<ProfileContent> createState() => _ProfileContentState();
+  ConsumerState<ProfileContent> createState() => _ProfileContentState();
 }
 
-class _ProfileContentState extends State<ProfileContent> {
+class _ProfileContentState extends ConsumerState<ProfileContent> {
   bool _notificationsEnabled = true;
+  final User? _user = FirebaseAuth.instance.currentUser;
+  String _displayName = '';
+  String? _profilePicB64;
+  String _displayEmail = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadName();
+    _loadGoals();
+    _loadNotificationStatus();
+  }
+
+  Future<void> _loadNotificationStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
+      });
+    }
+  }
+
+  Future<void> _loadName() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        if (mounted) {
+          setState(() {
+            _displayName = data['name'] ?? user.displayName ?? 'User Name';
+            _displayEmail = data['email'] ?? user.email ?? 'user@email.com';
+            _profilePicB64 = data['photoBase64'];
+          });
+        }
+        return;
+      }
+    } catch (e) {
+      print('Error loading name from Firestore: $e');
+    }
+
+    if (mounted) {
+      setState(() {
+        _displayName = user.displayName ?? 'User Name';
+        _displayEmail = user.email ?? 'user@email.com';
+        _profilePicB64 = null;
+      });
+    }
+  }
+
+  String _calories = '2000';
+  String _protein = '150g';
+  String _carbs = '250g';
+  String _fat = '60g';
+
+  Future<void> _loadGoals() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _calories = prefs.getString('Calories') ?? '2000';
+      _protein = '${prefs.getString('Protein') ?? '150'}g';
+      _carbs = '${prefs.getString('Carbs') ?? '250'}g';
+      _fat = '${prefs.getString('Fat') ?? '60'}g';
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,12 +97,14 @@ class _ProfileContentState extends State<ProfileContent> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── Header ────────────────────────────────────────────
-          const Text(
+          Text(
             'Profile',
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
-              color: Color(0xFF2D3748),
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : const Color(0xFF2D3748),
             ),
           ),
           const SizedBox(height: 20),
@@ -37,7 +114,7 @@ class _ProfileContentState extends State<ProfileContent> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
@@ -61,47 +138,66 @@ class _ProfileContentState extends State<ProfileContent> {
                           color: const Color(0xFF4A8B5C),
                           width: 3,
                         ),
-                        color: Colors.grey.shade200,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.grey.shade800
+                            : Colors.grey.shade200,
                       ),
                       child: ClipOval(
-                        child: Icon(
-                          Icons.person,
-                          size: 60,
-                          color: Colors.grey.shade400,
-                        ),
+                        child: _profilePicB64 != null && _profilePicB64!.isNotEmpty
+                            ? Image.memory(
+                                base64Decode(_profilePicB64!),
+                                fit: BoxFit.cover,
+                                width: 90,
+                                height: 90,
+                              )
+                            : Icon(
+                                Icons.person,
+                                size: 60,
+                                color: Colors.grey.shade400,
+                              ),
                       ),
                     ),
                     Positioned(
                       bottom: 2,
                       right: 2,
-                      child: Container(
-                        width: 26,
-                        height: 26,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF4A8B5C),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.edit_rounded,
-                          color: Colors.white,
-                          size: 14,
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+                          ).then((_) => _loadName());
+                        },
+                        child: Container(
+                          width: 26,
+                          height: 26,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF4A8B5C),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.edit_rounded,
+                            color: Colors.white,
+                            size: 14,
+                          ),
                         ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 14),
-                const Text(
-                  'Ahmad Malik',
+                Text(
+                  _displayName,
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF2D3748),
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : const Color(0xFF2D3748),
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'ahmad.malik@email.com',
+                  _displayEmail.isEmpty ? (_user?.email ?? 'user@email.com') : _displayEmail,
                   style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
                 ),
               ],
@@ -113,7 +209,7 @@ class _ProfileContentState extends State<ProfileContent> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
@@ -131,12 +227,14 @@ class _ProfileContentState extends State<ProfileContent> {
                   children: [
                     const Text('🏃', style: TextStyle(fontSize: 18)),
                     const SizedBox(width: 8),
-                    const Text(
+                    Text(
                       'Health Goals',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF2D3748),
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : const Color(0xFF2D3748),
                       ),
                     ),
                   ],
@@ -153,19 +251,30 @@ class _ProfileContentState extends State<ProfileContent> {
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
-                          CustomPaint(
+                          Positioned.fill(
+                            child: CustomPaint(
                             size: const Size(110, 110),
-                            painter: _GoalChartPainter(),
+                            painter: _GoalChartPainter(
+                              carbs: double.parse(_carbs.replaceAll('g', '').trim().isEmpty ? '250' : _carbs.replaceAll('g', '').trim()),
+                              protein: double.parse(_protein.replaceAll('g', '').trim().isEmpty ? '150' : _protein.replaceAll('g', '').trim()),
+                              fat: double.parse(_fat.replaceAll('g', '').trim().isEmpty ? '60' : _fat.replaceAll('g', '').trim()),
+                              ringColor: Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.grey.shade800
+                                  : Colors.grey.shade100,
+                               ),
+                            ),
                           ),
-                          const Column(
+                           Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                '2000',
+                                _calories,
                                 style: TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF2D3748),
+                                  color: Theme.of(context).brightness == Brightness.dark
+                                      ? Colors.white
+                                      : const Color(0xFF2D3748),
                                 ),
                               ),
                               Text(
@@ -187,31 +296,33 @@ class _ProfileContentState extends State<ProfileContent> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
+                          Text(
                             'Daily Nutrition Goals',
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF2D3748),
+                              color: Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.white
+                                  : const Color(0xFF2D3748),
                             ),
                           ),
                           const SizedBox(height: 10),
                           _buildGoalRow(
                             color: const Color(0xFFF2A65A),
-                            goal: '250g Carbs',
-                            value: '250g',
+                            goal: '$_carbs Carbs',
+                            value: _carbs,
                           ),
                           const SizedBox(height: 8),
                           _buildGoalRow(
                             color: const Color(0xFF5A92D6),
-                            goal: '150g Protein',
-                            value: '150g',
+                            goal: '$_protein Protein',
+                            value: _protein,
                           ),
                           const SizedBox(height: 8),
                           _buildGoalRow(
                             color: const Color(0xFF4A8B5C),
-                            goal: '60g Fat',
-                            value: '12g',
+                            goal: '$_fat Fat',
+                            value: _fat,
                           ),
                         ],
                       ),
@@ -225,7 +336,12 @@ class _ProfileContentState extends State<ProfileContent> {
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.push(
+                          context, 
+                          MaterialPageRoute(builder: (context) => const EditGoalsScreen()),
+                      ).then((_) => _loadGoals());
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2C5E3B),
                       shape: RoundedRectangleBorder(
@@ -252,7 +368,7 @@ class _ProfileContentState extends State<ProfileContent> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
@@ -295,7 +411,12 @@ class _ProfileContentState extends State<ProfileContent> {
                     Icons.chevron_right_rounded,
                     color: Colors.grey.shade400,
                   ),
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+                    ).then((_) => _loadName());
+                  },
                 ),
                 _buildDivider(),
 
@@ -308,22 +429,34 @@ class _ProfileContentState extends State<ProfileContent> {
                     activeColor: Colors.white,
                     activeTrackColor: const Color(0xFF4A8B5C),
                     inactiveTrackColor: Colors.grey.shade300,
-                    onChanged: (val) =>
-                        setState(() => _notificationsEnabled = val),
+                    onChanged: (val) async {
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setBool('notifications_enabled', val);
+                      if (mounted) {
+                        setState(() {
+                          _notificationsEnabled = val;
+                        });
+                      }
+                    },
                   ),
                   onTap: null,
                 ),
                 _buildDivider(),
 
-                // Privacy Policy
+                // Dark Mode Toggle
                 _buildSettingRow(
-                  icon: Icons.shield_rounded,
-                  label: 'Privacy Policy',
-                  trailing: Icon(
-                    Icons.chevron_right_rounded,
-                    color: Colors.grey.shade400,
+                  icon: Icons.dark_mode_rounded,
+                  label: 'Dark Mode',
+                  trailing: Switch(
+                    value: ref.watch(themeModeProvider) == ThemeMode.dark,
+                    activeColor: Colors.white,
+                    activeTrackColor: const Color(0xFF4A8B5C),
+                    inactiveTrackColor: Colors.grey.shade300,
+                    onChanged: (val) {
+                      ref.read(themeModeProvider.notifier).toggleTheme(val);
+                    },
                   ),
-                  onTap: () {},
+                  onTap: null,
                 ),
                 const SizedBox(height: 8),
               ],
@@ -336,11 +469,15 @@ class _ProfileContentState extends State<ProfileContent> {
             width: double.infinity,
             height: 50,
             child: OutlinedButton.icon(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginScreen()),
-                );
+              onPressed: () async {
+                await FirebaseAuth.instance.signOut();
+                if (mounted) {
+                  Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                        builder: (context) => const LoginScreen()),
+                    (route) => false,
+                  );
+                }
               },
               icon: const Icon(
                 Icons.logout_rounded,
@@ -386,16 +523,23 @@ class _ProfileContentState extends State<ProfileContent> {
             const SizedBox(width: 8),
             Text(
               goal,
-              style: const TextStyle(fontSize: 12, color: Color(0xFF2D3748)),
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white70
+                    : const Color(0xFF2D3748),
+              ),
             ),
           ],
         ),
         Text(
           value,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.bold,
-            color: Color(0xFF2D3748),
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : const Color(0xFF2D3748),
           ),
         ),
       ],
@@ -418,7 +562,9 @@ class _ProfileContentState extends State<ProfileContent> {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFFE8F5E9),
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFF2C5E3B).withOpacity(0.2)
+                    : const Color(0xFFE8F5E9),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(icon, color: const Color(0xFF4A8B5C), size: 18),
@@ -427,10 +573,12 @@ class _ProfileContentState extends State<ProfileContent> {
             Expanded(
               child: Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF2D3748),
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.white
+                      : const Color(0xFF2D3748),
                 ),
               ),
             ),
@@ -442,11 +590,22 @@ class _ProfileContentState extends State<ProfileContent> {
   }
 
   Widget _buildDivider() =>
-      Divider(height: 1, color: Colors.grey.shade100, indent: 44);
+      Divider(height: 1, color: Colors.grey.withOpacity(0.15), indent: 44);
 }
 
-// ── Goal Donut Chart Painter ──────────────────────────────────────────────────
 class _GoalChartPainter extends CustomPainter {
+  final double carbs;
+  final double protein;
+  final double fat;
+  final Color ringColor;
+
+  _GoalChartPainter({
+    required this.carbs,
+    required this.protein,
+    required this.fat,
+    required this.ringColor,
+  });
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
@@ -459,42 +618,51 @@ class _GoalChartPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     const double startAngle = -math.pi / 2;
+    const double gap = 0.08;
+
+    final total = carbs + protein + fat;
+    final carbsAngle = (carbs / total) * 2 * math.pi;
+    final proteinAngle = (protein / total) * 2 * math.pi;
+    final fatAngle = (fat / total) * 2 * math.pi;
 
     // Background ring
-    paint.color = Colors.grey.shade100;
+    paint.color = ringColor;
     canvas.drawCircle(center, radius, paint);
 
-    // Carbs — orange, ~47%
+    // Carbs — orange
     paint.color = const Color(0xFFF2A65A);
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
       startAngle,
-      math.pi * 0.94,
+      carbsAngle - gap,
       false,
       paint,
     );
 
-    // Protein — blue, ~31%
+    // Protein — blue
     paint.color = const Color(0xFF5A92D6);
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
-      startAngle + math.pi * 0.94 + 0.08,
-      math.pi * 0.62,
+      startAngle + carbsAngle,
+      proteinAngle - gap,
       false,
       paint,
     );
 
-    // Fat — green, ~22%
+    // Fat — green
     paint.color = const Color(0xFF4A8B5C);
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
-      startAngle + math.pi * 0.94 + math.pi * 0.62 + 0.16,
-      math.pi * 0.36,
+      startAngle + carbsAngle + proteinAngle,
+      fatAngle - gap,
       false,
       paint,
     );
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(_GoalChartPainter oldDelegate) =>
+      oldDelegate.carbs != carbs ||
+          oldDelegate.protein != protein ||
+          oldDelegate.fat != fat;
 }

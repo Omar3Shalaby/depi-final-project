@@ -1,156 +1,138 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/app_providers.dart';
+import '../providers/theme_provider.dart';
 import 'home.dart';
 import 'log_meal.dart';
 import 'history.dart';
 import 'profile.dart';
+import 'ai_recipe.dart';
+import 'meal_details.dart';
 
-/// Exposes MainShell's tab-switching to child content widgets.
-class MainShellScope extends InheritedWidget {
-  const MainShellScope({
-    super.key,
-    required this.setIndex,
-    required super.child,
-  });
-
-  final void Function(int) setIndex;
-
-  static MainShellScope? of(BuildContext context) =>
-      context.dependOnInheritedWidgetOfExactType<MainShellScope>();
-
-  @override
-  bool updateShouldNotify(MainShellScope oldWidget) => false;
-}
-
-/// The persistent shell: owns the background image and nav bar.
-/// Content is swapped via IndexedStack — no full-page transitions.
-class MainShell extends StatefulWidget {
+class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key});
 
   @override
-  State<MainShell> createState() => _MainShellState();
+  ConsumerState<MainShell> createState() => _MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
-  int _currentIndex = 0;
-
-  void _setIndex(int index) {
-    if (_currentIndex != index) setState(() => _currentIndex = index);
-  }
-
+class _MainShellState extends ConsumerState<MainShell> {
   @override
   Widget build(BuildContext context) {
-    return MainShellScope(
-      setIndex: _setIndex,
-      child: Scaffold(
-        body: Container(
-          width: double.infinity,
-          height: double.infinity,
-          decoration: const BoxDecoration(
-            image: DecorationImage(
-              image: AssetImage('assets/main bg.png'),
-              fit: BoxFit.cover,
-            ),
-          ),
-          child: SafeArea(
-            child: Stack(
-              children: [
-                // ── Page content (no animation, instant swap) ──────────
-                IndexedStack(
-                  index: _currentIndex,
-                  children: const [
-                    HomeContent(),      // index 0
-                    HistoryContent(),   // index 1
-                    LogMealContent(),   // index 2
-                    _StubPage('AI Recipes coming soon'), // index 3
-                    ProfileContent(),   // index 4
-                  ],
-                ),
+    final currentIndex = ref.watch(navigationIndexProvider);
+    final themeMode = ref.watch(themeModeProvider);
+    final isDark = themeMode == ThemeMode.dark || 
+        (themeMode == ThemeMode.system && MediaQuery.platformBrightnessOf(context) == Brightness.dark);
 
-                // ── Persistent Navigation Bar ──────────────────────────
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Container(
-                    margin: const EdgeInsets.only(
-                        left: 20, right: 20, bottom: 20),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(40),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
-                          blurRadius: 24,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _NavItem(
-                          icon: Icons.home_rounded,
-                          label: 'Home',
-                          index: 0,
-                          currentIndex: _currentIndex,
-                          onTap: _setIndex,
-                        ),
-                        _NavItem(
-                          icon: Icons.bookmark_border_rounded,
-                          label: 'History',
-                          index: 1,
-                          currentIndex: _currentIndex,
-                          onTap: _setIndex,
-                        ),
-                        // ── Center FAB ─────────────────────────────
-                        GestureDetector(
-                          onTap: () => _setIndex(_currentIndex == 2 ? 0 : 2),
-                          child: AnimatedContainer(
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage(isDark
+                ? 'assets/images/main_bg_dark.png'
+                : 'assets/images/main_bg.png'),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: SafeArea(
+          child: Stack(
+            children: [
+              IndexedStack(
+                index: currentIndex,
+                children: const [
+                  HomeContent(),
+                  HistoryContent(),
+                  LogMealContent(),
+                  AiRecipeAlternativeContent(),
+                  ProfileContent(),
+                  MealDetailsScreen(),
+                ],
+              ),
+              // Navigation Bar
+              Align(
+                alignment: Alignment.bottomCenter,
+                child: Container(
+                  margin: const EdgeInsets.only(
+                      left: 20, right: 20, bottom: 20),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(40),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.2 : 0.08),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _NavItem(
+                        icon: Icons.home_rounded,
+                        label: 'Home',
+                        index: 0,
+                        currentIndex: currentIndex,
+                        onTap: (i) => ref.read(navigationIndexProvider.notifier).state = i,
+                      ),
+                      _NavItem(
+                        icon: Icons.bookmark_border_rounded,
+                        label: 'History',
+                        index: 1,
+                        currentIndex: currentIndex,
+                        onTap: (i) => ref.read(navigationIndexProvider.notifier).state = i,
+                      ),
+                      GestureDetector(
+                        onTap: () => ref.read(navigationIndexProvider.notifier).state = currentIndex == 2 ? 0 : 2,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 220),
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: currentIndex == 2
+                                ? const Color(0xFF2C5E3B)
+                                : const Color(0xFF4A8B5C),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF4A8B5C)
+                                    .withOpacity(0.35),
+                                blurRadius: 14,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: AnimatedRotation(
+                            turns: currentIndex == 2 ? 0.125 : 0,
                             duration: const Duration(milliseconds: 220),
-                            width: 52,
-                            height: 52,
-                            decoration: BoxDecoration(
-                              color: _currentIndex == 2
-                                  ? const Color(0xFF2C5E3B)
-                                  : const Color(0xFF4A8B5C),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF4A8B5C)
-                                      .withOpacity(0.35),
-                                  blurRadius: 14,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: AnimatedRotation(
-                              turns: _currentIndex == 2 ? 0.125 : 0,
-                              duration: const Duration(milliseconds: 220),
-                              child: const Icon(Icons.add,
-                                  color: Colors.white, size: 28),
-                            ),
+                            child: const Icon(Icons.add,
+                                color: Colors.white, size: 28),
                           ),
                         ),
-                        _NavItem(
-                          icon: Icons.auto_awesome_rounded,
-                          label: 'AI Recipes',
-                          index: 3,
-                          currentIndex: _currentIndex,
-                          onTap: _setIndex,
-                        ),
-                        _NavItem(
-                          icon: Icons.person_outline_rounded,
-                          label: 'Profile',
-                          index: 4,
-                          currentIndex: _currentIndex,
-                          onTap: _setIndex,
-                        ),
-                      ],
-                    ),
+                      ),
+                      _NavItem(
+                        icon: Icons.auto_awesome_rounded,
+                        label: 'AI Recipes',
+                        index: 3,
+                        currentIndex: currentIndex,
+                        onTap: (i) => ref.read(navigationIndexProvider.notifier).state = i,
+                      ),
+                      _NavItem(
+                        icon: Icons.person_outline_rounded,
+                        label: 'Profile',
+                        index: 4,
+                        currentIndex: currentIndex,
+                        onTap: (i) => ref.read(navigationIndexProvider.notifier).state = i,
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -158,7 +140,6 @@ class _MainShellState extends State<MainShell> {
   }
 }
 
-// ── Reusable Nav Item ─────────────────────────────────────────────────────────
 class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.icon,
@@ -192,7 +173,7 @@ class _NavItem extends StatelessWidget {
                 key: ValueKey(isActive),
                 color: isActive
                     ? const Color(0xFF4A8B5C)
-                    : Colors.grey.shade400,
+                    : (Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade600 : Colors.grey.shade400),
                 size: 26,
               ),
             ),
@@ -205,31 +186,11 @@ class _NavItem extends StatelessWidget {
                     isActive ? FontWeight.bold : FontWeight.normal,
                 color: isActive
                     ? const Color(0xFF4A8B5C)
-                    : Colors.grey.shade500,
+                    : (Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade500 : Colors.grey.shade500),
               ),
               child: Text(label),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Stub for unbuilt pages ────────────────────────────────────────────────────
-class _StubPage extends StatelessWidget {
-  const _StubPage(this.message);
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        message,
-        style: const TextStyle(
-          color: Color(0xFF4A8B5C),
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
         ),
       ),
     );
